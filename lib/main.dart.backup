@@ -1,0 +1,1253 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:window_manager/window_manager.dart';
+
+Future<Directory> getMusicDir() async {
+  final home = Platform.environment['HOME'] ?? '.';
+  final dir = Directory('$home/Music/muzik420');
+  if (!await dir.exists()) await dir.create(recursive: true);
+  return dir;
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
+  await windowManager.setAlwaysOnTop(false);
+  await windowManager.setTitleBarStyle(TitleBarStyle.normal);
+  await windowManager.setMinimumSize(const Size(400, 300));
+  await windowManager.setMaximumSize(const Size(1200, 800));
+  await windowManager.setResizable(true);
+  await windowManager.setSize(const Size(800, 600));
+  await windowManager.center();
+  runApp(const Pro420App());
+}
+
+class Pro420App extends StatelessWidget {
+  const Pro420App({super.key});
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'pro420x1kmuxsk',
+    debugShowCheckedModeBanner: false,
+    theme: ThemeData.dark().copyWith(
+      scaffoldBackgroundColor: const Color(0xFF0A0A0F),
+      colorScheme: const ColorScheme.dark(primary: Color(0xFF7C5CFC), secondary: Color(0xFFFC5C9C))),
+    home: const MainScreen());
+}
+
+class Song {
+  final String title;
+  final String artist;
+  final String filePath;
+  final String? coverPath;
+  Song({required this.title, required this.artist, required this.filePath, this.coverPath});
+}
+
+class MusicPlaylist {
+  final String name;
+  final Directory dir;
+  final List<Song> songs;
+  MusicPlaylist({required this.name, required this.dir, required this.songs});
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, WindowListener {
+  int _tab = 0;
+  final _player = AudioPlayer();
+  List<Song> _songs = [];
+  List<MusicPlaylist> _playlists = [];
+  Song? _currentSong;
+  List<Song> _queue = [];
+  int? _currentIndex;
+  bool _editMode = false;
+  bool _isPlaying = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  bool _isMinimized = false;
+  int _versionTapCount = 0;
+  Timer? _versionTapTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    windowManager.addListener(this);
+    _loadAll();
+    _player.onPositionChanged.listen((p) { if (mounted) setState(() => _position = p); });
+    _player.onDurationChanged.listen((d) { if (mounted) setState(() => _duration = d); });
+    _player.onPlayerStateChanged.listen((s) {
+      if (mounted) setState(() => _isPlaying = (s == PlayerState.playing));
+      if (s == PlayerState.completed) _playNext();
+    });
+  }
+
+  @override
+  void onWindowMinimize() async {
+    if (!_isMinimized) await _setMiniMode(true);
+  }
+
+  @override
+  void onWindowRestore() async {
+    if (_isMinimized) await _setMiniMode(false);
+  }
+
+  Future<void> _setMiniMode(bool mini) async {
+    if (mini == _isMinimized) return;
+    setState(() => _isMinimized = mini);
+    if (mini) {
+      await windowManager.setAlwaysOnTop(true);
+      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      await windowManager.setMinimumSize(const Size(320, 120));
+      await windowManager.setMaximumSize(const Size(320, 120));
+      await windowManager.setResizable(false);
+      await windowManager.setSize(const Size(320, 120));
+    } else {
+      await windowManager.setAlwaysOnTop(false);
+      await windowManager.setTitleBarStyle(TitleBarStyle.normal);
+      await windowManager.setMinimumSize(const Size(400, 300));
+      await windowManager.setMaximumSize(const Size(1200, 800));
+      await windowManager.setResizable(true);
+      await windowManager.setSize(const Size(800, 600));
+      await windowManager.center();
+    }
+  }
+
+  void _toggleMinimize() => _setMiniMode(!_isMinimized);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) _player.stop();
+  }
+
+  bool _isAudio(String p) => RegExp(r'\.(mp3|m4a|aac|mp4|webm|ogg)$').hasMatch(p);
+
+  Future<void> _loadAll() async {
+    final base = await getMusicDir();
+    final songs = <Song>[];
+    final playlists = <MusicPlaylist>[];
+    final Set<String> inPlaylist = {};
+    try {
+      for (final e in base.listSync(recursive: false)) {
+        if (e is Directory) {
+          final plName = e.path.split('/').last;
+          final plSongs = <Song>[];
+          for (final f in e.listSync(recursive: false)) {
+            if (f is File && _isAudio(f.path)) {
+              final name = f.path.split('/').last.replaceAll(RegExp(r'\.(mp3|m4a|aac|mp4|webm|ogg)$'), '');
+              final cover = f.path.replaceAll(RegExp(r'\.(mp3|m4a|aac|mp4|webm|ogg)$'), '.jpg');
+              final song = Song(title: name, artist: plName,
+                filePath: f.path, coverPath: File(cover).existsSync() ? cover : null);
+              plSongs.add(song);
+              inPlaylist.add(f.path);
+            }
+          }
+          playlists.add(MusicPlaylist(name: plName, dir: e, songs: plSongs));
+        }
+      }
+    } catch (_) {}
+    final rootDirs = [base, Directory('/storage/emulated/0/Music'), Directory('/storage/emulated/0/Download')];
+    for (final d in rootDirs) {
+      if (!await d.exists()) continue;
+      try {
+        for (final e in d.listSync(recursive: false)) {
+          if (e is File && _isAudio(e.path) && !inPlaylist.contains(e.path)) {
+            final name = e.path.split('/').last.replaceAll(RegExp(r'\.(mp3|m4a|aac|mp4|webm|ogg)$'), '');
+            final cover = e.path.replaceAll(RegExp(r'\.(mp3|m4a|aac|mp4|webm|ogg)$'), '.jpg');
+            songs.add(Song(title: name, artist: 'Невідомий виконавець',
+              filePath: e.path, coverPath: File(cover).existsSync() ? cover : null));
+          }
+        }
+      } catch (_) {}
+    }
+    if (mounted) setState(() { _songs = songs; _playlists = playlists; });
+  }
+
+  Future<void> _playSong(Song song, {List<Song>? queue}) async {
+    final q = queue ?? _songs;
+    final idx = q.indexWhere((s) => s.filePath == song.filePath);
+    setState(() { _currentSong = song; _queue = List.from(q); _currentIndex = idx < 0 ? 0 : idx; });
+    try {
+      await _player.setSource(DeviceFileSource(song.filePath));
+      await _player.resume();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('❌ $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
+    }
+  }
+
+  void _playNext() {
+    if (_queue.isEmpty || _currentIndex == null) return;
+    _playSong(_queue[(_currentIndex! + 1) % _queue.length], queue: _queue);
+  }
+  void _playPrev() {
+    if (_queue.isEmpty || _currentIndex == null) return;
+    _playSong(_queue[(_currentIndex! - 1 + _queue.length) % _queue.length], queue: _queue);
+  }
+  Future<void> _stopPlayer() async {
+    await _player.stop();
+    if (mounted) setState(() { _currentSong = null; _queue = []; _currentIndex = null; });
+    if (_isMinimized) await _setMiniMode(false);
+  }
+
+  Future<void> _deleteSong(Song song) async {
+    final ok = await _confirmDialog('Видалити "${song.title}"?');
+    if (ok != true) return;
+    if (_currentSong?.filePath == song.filePath) await _stopPlayer();
+    try { await File(song.filePath).delete(); } catch (_) {}
+    if (song.coverPath != null) try { await File(song.coverPath!).delete(); } catch (_) {}
+    _loadAll();
+  }
+  Future<void> _renameSong(Song song) async {
+    final ctrl = TextEditingController(text: song.title);
+    final name = await _inputDialog('Перейменувати', ctrl);
+    if (name == null || name.isEmpty || name == song.title) return;
+    final dir = File(song.filePath).parent.path;
+    final ext = song.filePath.split('.').last;
+    try {
+      await File(song.filePath).rename('$dir/$name.$ext');
+      if (song.coverPath != null) await File(song.coverPath!).rename('$dir/$name.jpg');
+    } catch (_) {}
+    if (_currentSong?.filePath == song.filePath) await _stopPlayer();
+    _loadAll();
+  }
+  Future<void> _changeCover(Song song) async { return; }
+  void _moveSong(Song song, int dir) {
+    final idx = _songs.indexWhere((s) => s.filePath == song.filePath);
+    if (idx < 0) return;
+    final ni = (idx + dir).clamp(0, _songs.length - 1);
+    if (ni == idx) return;
+    setState(() {
+      _songs.removeAt(idx);
+      _songs.insert(ni, song);
+      if (_currentIndex == idx) _currentIndex = ni;
+      else if (_currentIndex == ni) _currentIndex = idx;
+    });
+  }
+  void _showSongMenu(Song song, {bool inPlaylist = false}) {
+    final idx = _songs.indexWhere((s) => s.filePath == song.filePath);
+    showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
+      builder: (_) => _EditSheet(title: song.title, options: [
+        _EditOpt(Icons.delete_outline_rounded, Colors.red, 'Видалити',
+          () { Navigator.pop(context); _deleteSong(song); }),
+        if (!inPlaylist) _EditOpt(Icons.drive_file_rename_outline_rounded, const Color(0xFF7C5CFC), 'Перейменувати',
+          () { Navigator.pop(context); _renameSong(song); }),
+        if (!inPlaylist) _EditOpt(Icons.arrow_upward_rounded, const Color(0xFF4CAF50), 'Вгору',
+          idx > 0 ? () { Navigator.pop(context); _moveSong(song, -1); } : null),
+        if (!inPlaylist) _EditOpt(Icons.arrow_downward_rounded, const Color(0xFF4CAF50), 'Вниз',
+          idx < _songs.length - 1 ? () { Navigator.pop(context); _moveSong(song, 1); } : null),
+        _EditOpt(Icons.image_rounded, const Color(0xFFFC5C9C), 'Обкладинка',
+          () { Navigator.pop(context); _changeCover(song); }),
+        if (!inPlaylist) _EditOpt(Icons.playlist_add_rounded, const Color(0xFFFFAA00), 'Додати до плейлісту',
+          () { Navigator.pop(context); _addToPlaylistDialog(song); }),
+      ]));
+  }
+  Future<void> _createPlaylist() async {
+    final ctrl = TextEditingController();
+    final name = await _inputDialog('Новий плейліст', ctrl, hint: 'Назва плейлісту');
+    if (name == null || name.isEmpty) return;
+    final base = await getMusicDir();
+    final plDir = Directory('${base.path}/$name');
+    if (!await plDir.exists()) await plDir.create();
+    _loadAll();
+  }
+  Future<void> _deletePlaylist(MusicPlaylist pl) async {
+    final ok = await _confirmDialog('Видалити "${pl.name}" з усіма піснями?');
+    if (ok != true) return;
+    if (_currentSong != null && pl.songs.any((s) => s.filePath == _currentSong!.filePath)) {
+      await _stopPlayer();
+    }
+    try { await pl.dir.delete(recursive: true); } catch (_) {}
+    _loadAll();
+  }
+  Future<void> _addToPlaylistDialog(Song song) async {
+    if (_playlists.isEmpty) {
+      final ok = await _confirmDialog('Немає плейлістів. Створити новий?');
+      if (ok != true) return;
+      await _createPlaylist();
+      if (_playlists.isEmpty) return;
+    }
+    final pl = await showDialog<MusicPlaylist>(context: context, builder: (_) => AlertDialog(
+      backgroundColor: const Color(0xFF12121A),
+      title: const Text('Перемістити до плейлісту', style: TextStyle(color: Colors.white)),
+      content: Column(mainAxisSize: MainAxisSize.min,
+        children: _playlists.map((p) => ListTile(
+          leading: const Icon(Icons.queue_music_rounded, color: Color(0xFF7C5CFC)),
+          title: Text(p.name, style: const TextStyle(color: Colors.white)),
+          subtitle: Text('${p.songs.length} пісень', style: const TextStyle(color: Color(0xFF6A6A88))),
+          onTap: () => Navigator.pop(context, p))).toList())));
+    if (pl == null) return;
+    try {
+      final dest = '${pl.dir.path}/${song.filePath.split('/').last}';
+      await File(song.filePath).copy(dest);
+      if (song.coverPath != null) {
+        await File(song.coverPath!).copy('${pl.dir.path}/${song.coverPath!.split('/').last}');
+        await File(song.coverPath!).delete();
+      }
+      await File(song.filePath).delete();
+      if (_currentSong?.filePath == song.filePath) await _stopPlayer();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ Переміщено до "${pl.name}"'), backgroundColor: const Color(0xFF4CAF50),
+        behavior: SnackBarBehavior.floating));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('❌ $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
+    }
+    _loadAll();
+  }
+  Future<bool?> _confirmDialog(String msg) => showDialog<bool>(context: context,
+    builder: (_) => AlertDialog(
+      backgroundColor: const Color(0xFF12121A),
+      content: Text(msg, style: const TextStyle(color: Colors.white)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false),
+          child: const Text('Скасувати', style: TextStyle(color: Color(0xFF6A6A88)))),
+        TextButton(onPressed: () => Navigator.pop(context, true),
+          child: const Text('Так', style: TextStyle(color: Colors.red))),
+      ]));
+  Future<String?> _inputDialog(String title, TextEditingController ctrl, {String hint = ''}) =>
+    showDialog<String>(context: context, builder: (_) => AlertDialog(
+      backgroundColor: const Color(0xFF12121A),
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      content: TextField(controller: ctrl, autofocus: true,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(hintText: hint,
+          hintStyle: const TextStyle(color: Color(0xFF6A6A88)),
+          filled: true, fillColor: const Color(0xFF1A1A28),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF2A2A40))),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF7C5CFC))))),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context),
+          child: const Text('Скасувати', style: TextStyle(color: Color(0xFF6A6A88)))),
+        TextButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+          child: const Text('OK', style: TextStyle(color: Color(0xFF7C5CFC)))),
+      ]));
+
+  void _onVersionTap() {
+    _versionTapCount++;
+    if (_versionTapTimer != null) {
+      _versionTapTimer!.cancel();
+      _versionTapTimer = null;
+    }
+    _versionTapTimer = Timer(const Duration(milliseconds: 500), () {
+      _versionTapCount = 0;
+      _versionTapTimer = null;
+    });
+    if (_versionTapCount >= 3) {
+      _versionTapCount = 0;
+      _versionTapTimer?.cancel();
+      _versionTapTimer = null;
+      _launchDoom();
+    }
+  }
+
+  void _launchDoom() async {
+    final doomCmds = ['chocolate-doom', 'gzdoom', 'doom'];
+    String? found;
+    for (final cmd in doomCmds) {
+      final result = await Process.run('which', [cmd]).catchError((_) => null);
+      if (result != null && result.exitCode == 0) {
+        found = cmd;
+        break;
+      }
+    }
+    if (found != null) {
+      try {
+        await Process.start(found, []);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('🔥 DOOM запущено!', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Color(0xFF7C5CFC),
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+      } catch (e) {
+        _showDoomInstallDialog();
+      }
+    } else {
+      _showDoomInstallDialog();
+    }
+  }
+
+  void _showDoomInstallDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF12121A),
+        title: const Text('🔥 DOOM не знайдено!', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Щоб запустити DOOM, встановіть один із портів:', style: TextStyle(color: Colors.white70)),
+            SizedBox(height: 8),
+            Text('• chocolate-doom', style: TextStyle(color: Color(0xFF7C5CFC))),
+            Text('• gzdoom', style: TextStyle(color: Color(0xFFFC5C9C))),
+            SizedBox(height: 8),
+            Text('Команда для Fedora:', style: TextStyle(color: Colors.white70)),
+            Text('sudo dnf install chocolate-doom', style: TextStyle(color: Color(0xFF4CAF50), fontFamily: 'monospace')),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрити', style: TextStyle(color: Color(0xFF6A6A88))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    windowManager.removeListener(this);
+    _player.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _isMinimized
+        ? _MiniPlayerWidget(
+            song: _currentSong,
+            isPlaying: _isPlaying,
+            position: _position,
+            duration: _duration,
+            onPlayPause: () => _isPlaying ? _player.pause() : _player.resume(),
+            onNext: _playNext,
+            onPrev: _playPrev,
+            onStop: _stopPlayer,
+            onExpand: () => _setMiniMode(false),
+          )
+        : Scaffold(
+            backgroundColor: const Color(0xFF0A0A0F),
+            body: Column(children: [
+              Expanded(child: IndexedStack(index: _tab, children: [
+                _SongsTab(
+                  songs: _songs,
+                  playlists: _playlists,
+                  currentSong: _currentSong,
+                  onPlay: (s) => _playSong(s, queue: _songs),
+                  onPlayPlaylist: (s, pl) => _playSong(s, queue: pl.songs),
+                  onRefresh: _loadAll,
+                  editMode: _editMode,
+                  onToggleEdit: () => setState(() => _editMode = !_editMode),
+                  onSongMenu: _showSongMenu,
+                  onCreatePlaylist: _createPlaylist,
+                  onDeletePlaylist: _deletePlaylist,
+                  onVersionTap: _onVersionTap,
+                ),
+                _DownloadTab(onSongAdded: _loadAll),
+              ])),
+              if (_currentSong != null) _MiniPlayerBar(
+                song: _currentSong!,
+                isPlaying: _isPlaying,
+                position: _position,
+                duration: _duration,
+                onPlayPause: () => _isPlaying ? _player.pause() : _player.resume(),
+                onNext: _playNext,
+                onPrev: _playPrev,
+                onStop: _stopPlayer,
+                onMinimize: _toggleMinimize,
+              ),
+              _BottomNav(current: _tab, onChange: (i) => setState(() => _tab = i)),
+            ]),
+          );
+  }
+}
+
+class _MiniPlayerWidget extends StatelessWidget {
+  final Song? song;
+  final bool isPlaying;
+  final Duration position, duration;
+  final VoidCallback onPlayPause, onNext, onPrev, onStop, onExpand;
+  const _MiniPlayerWidget({this.song, required this.isPlaying, required this.position,
+    required this.duration, required this.onPlayPause, required this.onNext,
+    required this.onPrev, required this.onStop, required this.onExpand});
+
+  String _fmt(Duration d) => '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 320,
+      height: 120,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF12121A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2A2A40)),
+      ),
+      child: Column(children: [
+        Row(children: [
+          if (song?.coverPath != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(File(song!.coverPath!), width: 48, height: 48, fit: BoxFit.cover))
+          else
+            Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]),
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              child: const Icon(Icons.music_note, color: Colors.white)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(song?.title ?? 'Немає пісні',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('${_fmt(position)} / ${_fmt(duration)}',
+              style: const TextStyle(color: Color(0xFF6A6A88), fontSize: 10)),
+          ])),
+          IconButton(icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF6A6A88)),
+            onPressed: onStop, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+          IconButton(icon: const Icon(Icons.open_in_full_rounded, size: 18, color: Color(0xFF6A6A88)),
+            onPressed: onExpand, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        ]),
+        const SizedBox(height: 4),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          IconButton(icon: const Icon(Icons.skip_previous_rounded, color: Color(0xFF6A6A88), size: 22),
+            onPressed: onPrev, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+          IconButton(icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+            color: const Color(0xFF7C5CFC), size: 32),
+            onPressed: onPlayPause, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+          IconButton(icon: const Icon(Icons.skip_next_rounded, color: Color(0xFF6A6A88), size: 22),
+            onPressed: onNext, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _MiniPlayerBar extends StatelessWidget {
+  final Song song;
+  final bool isPlaying;
+  final Duration position, duration;
+  final VoidCallback onPlayPause, onNext, onPrev, onStop, onMinimize;
+  const _MiniPlayerBar({required this.song, required this.isPlaying, required this.position,
+    required this.duration, required this.onPlayPause, required this.onNext,
+    required this.onPrev, required this.onStop, required this.onMinimize});
+
+  String _fmt(Duration d) => '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF12121A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A2A40)),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: song.coverPath != null
+              ? Image.file(File(song.coverPath!), width: 40, height: 40, fit: BoxFit.cover)
+              : Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  child: const Icon(Icons.music_note, color: Colors.white))),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(song.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text('${_fmt(position)} / ${_fmt(duration)}',
+            style: const TextStyle(color: Color(0xFF6A6A88), fontSize: 10)),
+        ])),
+        IconButton(icon: const Icon(Icons.skip_previous_rounded, color: Color(0xFF6A6A88), size: 22),
+          onPressed: onPrev, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        IconButton(icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+          color: const Color(0xFF7C5CFC), size: 30),
+          onPressed: onPlayPause, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        IconButton(icon: const Icon(Icons.skip_next_rounded, color: Color(0xFF6A6A88), size: 22),
+          onPressed: onNext, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        IconButton(icon: const Icon(Icons.close_rounded, color: Color(0xFF6A6A88), size: 20),
+          onPressed: onStop, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        IconButton(icon: const Icon(Icons.remove_rounded, color: Color(0xFF6A6A88), size: 20),
+          onPressed: onMinimize, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+      ]),
+    );
+  }
+}
+
+class _SongsTab extends StatelessWidget {
+  final List<Song> songs;
+  final List<MusicPlaylist> playlists;
+  final Song? currentSong;
+  final Function(Song) onPlay;
+  final Function(Song, MusicPlaylist) onPlayPlaylist;
+  final VoidCallback onRefresh;
+  final bool editMode;
+  final VoidCallback onToggleEdit;
+  final Function(Song, {bool inPlaylist}) onSongMenu;
+  final VoidCallback onCreatePlaylist;
+  final Function(MusicPlaylist) onDeletePlaylist;
+  final VoidCallback onVersionTap;
+
+  const _SongsTab({
+    required this.songs, required this.playlists, this.currentSong,
+    required this.onPlay, required this.onPlayPlaylist, required this.onRefresh,
+    required this.editMode, required this.onToggleEdit, required this.onSongMenu,
+    required this.onCreatePlaylist, required this.onDeletePlaylist,
+    required this.onVersionTap,
+  });
+
+  Future<void> _importFiles(BuildContext context) async { return; }
+  void _showHeaderMenu(BuildContext context) {
+    showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(color: Color(0xFF12121A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(color: const Color(0xFF2A2A40), borderRadius: BorderRadius.circular(2))),
+          _MenuTile(icon: Icons.create_new_folder_rounded, color: const Color(0xFFFC5C9C),
+            label: 'Новий плейліст',
+            onTap: () { Navigator.pop(context); onCreatePlaylist(); }),
+          _MenuTile(icon: Icons.refresh_rounded, color: const Color(0xFF4CAF50),
+            label: 'Оновити список',
+            onTap: () { Navigator.pop(context); onRefresh(); }),
+        ])));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(child: Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Row(children: [
+          ShaderMask(
+            shaderCallback: (b) => const LinearGradient(
+              colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]).createShader(b),
+            child: const Text('pro420x1kmuxsk',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white))),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: onVersionTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              ),
+              child: Text(
+                'v3.0',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(onTap: onToggleEdit, child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: editMode ? const Color(0xFF7C5CFC).withOpacity(0.2) : Colors.transparent,
+              border: Border.all(color: editMode ? const Color(0xFF7C5CFC) : const Color(0xFF2A2A40)),
+              borderRadius: BorderRadius.circular(8)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(editMode ? Icons.check_rounded : Icons.edit_rounded,
+                color: editMode ? const Color(0xFF7C5CFC) : const Color(0xFF6A6A88), size: 15),
+              const SizedBox(width: 4),
+              Text(editMode ? 'Готово' : 'Ред.', style: TextStyle(
+                color: editMode ? const Color(0xFF7C5CFC) : const Color(0xFF6A6A88),
+                fontSize: 12, fontWeight: FontWeight.w600)),
+            ]))),
+          const SizedBox(width: 6),
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF6A6A88), size: 24),
+            padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+            onPressed: () => _showHeaderMenu(context)),
+        ])),
+      const SizedBox(height: 8),
+      Expanded(child: (songs.isEmpty && playlists.isEmpty)
+        ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(color: const Color(0xFF12121A), borderRadius: BorderRadius.circular(28)),
+              child: const Icon(Icons.music_off_rounded, size: 60, color: Color(0xFF6A6A88))),
+            const SizedBox(height: 20),
+            const Text('Немає пісень', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Text('Завантаж або імпортуй музику',
+              style: TextStyle(color: Color(0xFF6A6A88), fontSize: 14)),
+          ]))
+        : ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+            if (songs.isNotEmpty) ...[
+              _SectionHeader(icon: Icons.music_note_rounded, title: 'Пісні', count: songs.length),
+              ...songs.map((s) => _SongTile(
+                song: s,
+                active: currentSong?.filePath == s.filePath,
+                editMode: editMode,
+                onTap: () => onPlay(s),
+                onMenu: () => onSongMenu(s))),
+            ],
+            if (playlists.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _SectionHeader(icon: Icons.queue_music_rounded, title: 'Плейлісти', count: playlists.length),
+              ...playlists.map((pl) => _PlaylistTile(
+                playlist: pl,
+                currentSong: currentSong,
+                editMode: editMode,
+                onDelete: () => onDeletePlaylist(pl),
+                onPlaySong: (s) => onPlayPlaylist(s, pl),
+                onSongMenu: (s) => onSongMenu(s, inPlaylist: true),
+              )),
+            ],
+          ])),
+    ]));
+  }
+}
+
+class _MenuTile extends StatelessWidget {
+  final IconData icon; final Color color; final String label; final VoidCallback onTap;
+  const _MenuTile({required this.icon, required this.color, required this.label, required this.onTap});
+  @override
+  Widget build(BuildContext context) => Material(color: Colors.transparent,
+    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12),
+      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+        child: Row(children: [
+          Container(width: 42, height: 42,
+            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 22)),
+          const SizedBox(width: 14),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+        ]))));
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon; final String title; final int count;
+  const _SectionHeader({required this.icon, required this.title, required this.count});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(children: [
+      Icon(icon, color: const Color(0xFF7C5CFC), size: 18),
+      const SizedBox(width: 6),
+      Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+      const SizedBox(width: 6),
+      Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(color: const Color(0xFF7C5CFC).withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8)),
+        child: Text('$count', style: const TextStyle(
+          color: Color(0xFF7C5CFC), fontSize: 11, fontWeight: FontWeight.w600))),
+    ]));
+}
+
+class _PlaylistTile extends StatefulWidget {
+  final MusicPlaylist playlist; final Song? currentSong; final bool editMode;
+  final VoidCallback onDelete; final Function(Song) onPlaySong; final Function(Song) onSongMenu;
+  const _PlaylistTile({required this.playlist, this.currentSong, required this.editMode,
+    required this.onDelete, required this.onPlaySong, required this.onSongMenu});
+  @override
+  State<_PlaylistTile> createState() => _PlaylistTileState();
+}
+class _PlaylistTileState extends State<_PlaylistTile> {
+  bool _expanded = false;
+  @override
+  Widget build(BuildContext context) {
+    final pl = widget.playlist;
+    final hasActive = pl.songs.any((s) => s.filePath == widget.currentSong?.filePath);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: hasActive ? const Color(0xFF7C5CFC).withOpacity(0.1) : const Color(0xFF12121A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: hasActive ? const Color(0xFF7C5CFC).withOpacity(0.4) : const Color(0xFF2A2A40))),
+      child: Column(children: [
+        InkWell(borderRadius: BorderRadius.circular(16),
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(children: [
+              Container(width: 46, height: 46,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]),
+                  borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.queue_music_rounded, color: Colors.white, size: 24)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(pl.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white)),
+                Text('${pl.songs.length} пісень', style: const TextStyle(color: Color(0xFF6A6A88), fontSize: 12)),
+              ])),
+              if (widget.editMode)
+                IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                  padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+                  onPressed: widget.onDelete),
+              const SizedBox(width: 4),
+              AnimatedRotation(turns: _expanded ? 0.5 : 0, duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF6A6A88), size: 22)),
+            ]))),
+        if (_expanded) ...[
+          const Divider(color: Color(0xFF2A2A40), height: 1),
+          ...pl.songs.map((s) => _SongTile(
+            song: s,
+            active: widget.currentSong?.filePath == s.filePath,
+            editMode: widget.editMode,
+            onTap: () => widget.onPlaySong(s),
+            onMenu: () => widget.onSongMenu(s),
+            indent: true)),
+        ],
+      ]));
+  }
+}
+
+class _SongTile extends StatelessWidget {
+  final Song song; final bool active; final bool editMode;
+  final VoidCallback onTap; final VoidCallback onMenu; final bool indent;
+  const _SongTile({required this.song, required this.active, required this.editMode,
+    required this.onTap, required this.onMenu, this.indent = false});
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: EdgeInsets.only(bottom: 8, left: indent ? 8 : 0),
+    decoration: BoxDecoration(
+      color: active ? const Color(0xFF7C5CFC).withOpacity(0.15) : const Color(0xFF0F0F1A),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: active ? const Color(0xFF7C5CFC).withOpacity(0.4) : const Color(0xFF2A2A40))),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      leading: _SongCover(coverPath: song.coverPath, active: active, size: 46),
+      title: Text(song.title, style: TextStyle(fontWeight: FontWeight.w600,
+        color: active ? const Color(0xFF7C5CFC) : Colors.white, fontSize: 13),
+        maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: editMode
+        ? IconButton(icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF6A6A88), size: 20),
+            padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onMenu)
+        : (active ? const Icon(Icons.equalizer_rounded, color: Color(0xFF7C5CFC), size: 20) : null),
+      onTap: onTap));
+}
+
+class _EditOpt {
+  final IconData icon; final Color color; final String label; final VoidCallback? onTap;
+  _EditOpt(this.icon, this.color, this.label, this.onTap);
+}
+class _EditSheet extends StatelessWidget {
+  final String title; final List<_EditOpt> options;
+  const _EditSheet({required this.title, required this.options});
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(color: Color(0xFF12121A),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(color: const Color(0xFF2A2A40), borderRadius: BorderRadius.circular(2))),
+      Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+        maxLines: 1, overflow: TextOverflow.ellipsis),
+      const SizedBox(height: 12),
+      ...options.map((o) => Material(color: Colors.transparent,
+        child: InkWell(onTap: o.onTap, borderRadius: BorderRadius.circular(12),
+          child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            child: Row(children: [
+              Container(width: 38, height: 38,
+                decoration: BoxDecoration(color: o.color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(o.icon, color: o.onTap != null ? o.color : o.color.withOpacity(0.3), size: 18)),
+              const SizedBox(width: 12),
+              Text(o.label, style: TextStyle(
+                color: o.onTap != null ? Colors.white : const Color(0xFF4A4A60),
+                fontSize: 14, fontWeight: FontWeight.w500)),
+            ]))))),
+    ]));
+}
+
+class _SongCover extends StatelessWidget {
+  final String? coverPath; final bool active; final double size;
+  const _SongCover({this.coverPath, required this.active, required this.size});
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(size * 0.2),
+    child: coverPath != null
+      ? Image.file(File(coverPath!), width: size, height: size, fit: BoxFit.cover)
+      : Container(width: size, height: size,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: active
+              ? [const Color(0xFF7C5CFC), const Color(0xFFFC5C9C)]
+              : [const Color(0xFF2A2A40), const Color(0xFF1A1A28)]),
+            borderRadius: BorderRadius.circular(size * 0.2)),
+          child: Icon(Icons.music_note_rounded,
+            color: active ? Colors.white : const Color(0xFF6A6A88), size: size * 0.48)));
+}
+
+class _DownloadTab extends StatelessWidget {
+  final VoidCallback onSongAdded;
+  const _DownloadTab({required this.onSongAdded});
+  @override
+  Widget build(BuildContext context) => SafeArea(child: Column(children: [
+    Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ShaderMask(
+          shaderCallback: (b) => const LinearGradient(
+            colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]).createShader(b),
+          child: const Text('Завантажити',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white))),
+        const Text('pro420x1kmuxsk v3.0',
+          style: TextStyle(color: Color(0xFF6A6A88), fontSize: 11)),
+      ])),
+    Expanded(child: _UniversalDownloader(onSongAdded: onSongAdded)),
+  ]));
+}
+
+class _UniversalDownloader extends StatefulWidget {
+  final VoidCallback onSongAdded;
+  const _UniversalDownloader({required this.onSongAdded});
+  @override
+  State<_UniversalDownloader> createState() => _UniversalDownloaderState();
+}
+
+class _UniversalDownloaderState extends State<_UniversalDownloader> {
+  final _ctrl = TextEditingController();
+  final _plCtrl = TextEditingController();
+  bool _loading = false;
+  String _status = '';
+  String? _thumbUrl;
+  double _progress = 0;
+  String _progressText = '';
+
+  bool get _isYtPlaylist => _ctrl.text.contains('playlist?list=') ||
+    (_ctrl.text.contains('youtube') && _ctrl.text.contains('list='));
+  bool get _isYt => _ctrl.text.contains('youtube.com') || _ctrl.text.contains('youtu.be');
+  bool get _isTt => _ctrl.text.contains('tiktok.com');
+
+  String get _detectedType {
+    final url = _ctrl.text.trim();
+    if (url.isEmpty) return '';
+    if (url.contains('tiktok.com')) return 'TikTok відео';
+    if (_isYtPlaylist) return 'YouTube Плейліст';
+    if (url.contains('youtube.com') || url.contains('youtu.be')) return 'YouTube Відео';
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final type = _detectedType;
+    return SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(decoration: BoxDecoration(color: const Color(0xFF12121A),
+          borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF2A2A40))),
+          child: TextField(controller: _ctrl, style: const TextStyle(color: Colors.white, fontSize: 14),
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: 'Вставте посилання YouTube або TikTok',
+              hintStyle: TextStyle(color: Color(0xFF6A6A88), fontSize: 13),
+              prefixIcon: Icon(Icons.link_rounded, color: Color(0xFF7C5CFC)),
+              border: InputBorder.none, contentPadding: EdgeInsets.all(16)))),
+        if (type.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C5CFC).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.3))),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFC), size: 14),
+              const SizedBox(width: 6),
+              Text('Визначено: $type',
+                style: const TextStyle(color: Color(0xFF7C5CFC), fontSize: 12, fontWeight: FontWeight.w600)),
+            ])),
+        ],
+        if (_isYtPlaylist) ...[
+          const SizedBox(height: 12),
+          const Text('Назва папки (плейлісту)', style: TextStyle(color: Color(0xFF6A6A88), fontSize: 13)),
+          const SizedBox(height: 8),
+          Container(decoration: BoxDecoration(color: const Color(0xFF12121A),
+            borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF2A2A40))),
+            child: TextField(controller: _plCtrl, style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'Назва плейлісту...',
+                hintStyle: TextStyle(color: Color(0xFF6A6A88), fontSize: 13),
+                prefixIcon: Icon(Icons.folder_rounded, color: Color(0xFFFC5C9C)),
+                border: InputBorder.none, contentPadding: EdgeInsets.all(16)))),
+        ],
+        const SizedBox(height: 14),
+        GestureDetector(onTap: _loading ? null : _download,
+          child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: _loading ? null : const LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]),
+              color: _loading ? const Color(0xFF2A2A40) : null,
+              borderRadius: BorderRadius.circular(16)),
+            child: Center(child: _loading
+              ? Row(mainAxisSize: MainAxisSize.min, children: [
+                  const SizedBox(width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7C5CFC))),
+                  const SizedBox(width: 12),
+                  Text('Завантаження... $_progressText',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                ])
+              : const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.download_rounded, color: Colors.white), SizedBox(width: 8),
+                  Text('Завантажити', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                ])))),
+        if (_loading && _progress > 0) ...[
+          const SizedBox(height: 12),
+          ClipRRect(borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(value: _progress,
+              backgroundColor: const Color(0xFF2A2A40),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFF7C5CFC)), minHeight: 8)),
+          const SizedBox(height: 6),
+          Text('${(_progress * 100).toInt()}%  $_progressText',
+            style: const TextStyle(color: Color(0xFF6A6A88), fontSize: 12)),
+        ],
+        if (_thumbUrl != null) ...[
+          const SizedBox(height: 16),
+          ClipRRect(borderRadius: BorderRadius.circular(16),
+            child: Image.network(_thumbUrl!, width: double.infinity, height: 170, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+        ],
+        if (_status.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xFF12121A),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF2A2A40))),
+            child: Text(_status,
+              style: const TextStyle(color: Color(0xFFE8E8F0), fontSize: 13, height: 1.6))),
+        ],
+      ]));
+  }
+
+  Future<void> _download() async {
+    final url = _ctrl.text.trim();
+    if (url.isEmpty) { setState(() => _status = '⚠️ Вставте посилання'); return; }
+    if (_isYtPlaylist) {
+      await _downloadYtPlaylist(url);
+    } else if (_isYt) {
+      await _downloadYtVideo(url);
+    } else if (_isTt) {
+      await _downloadTikTok(url);
+    } else {
+      setState(() => _status = '⚠️ Не розпізнано. Підтримується: YouTube, YouTube Playlist, TikTok');
+    }
+  }
+
+  Future<void> _downloadYtVideo(String url) async {
+    setState(() { _loading = true; _status = 'Підключаюсь...'; _progress = 0.05; _thumbUrl = null; });
+    final yt = YoutubeExplode();
+    try {
+      final dir = await getMusicDir();
+      final video = await yt.videos.get(url);
+      final safe = video.title.replaceAll(RegExp(r'[<>:"/\\|?*#]'), '').trim();
+      setState(() { _thumbUrl = video.thumbnails.highResUrl; _status = 'Знайдено: ${video.title}'; _progress = 0.15; });
+      try {
+        final t = await http.get(Uri.parse(video.thumbnails.highResUrl)).timeout(const Duration(seconds: 8));
+        if (t.statusCode == 200) await File('${dir.path}/$safe.jpg').writeAsBytes(t.bodyBytes);
+      } catch (_) {}
+      await _downloadYtStream(yt, video.id.value, dir.path, safe);
+      widget.onSongAdded();
+    } catch (e) {
+      setState(() { _status = '❌ Помилка: $e'; _loading = false; _progress = 0; });
+    } finally { yt.close(); }
+  }
+
+  Future<void> _downloadYtStream(YoutubeExplode yt, String videoId, String savePath, String safe) async {
+    setState(() { _status = 'Отримую стріми...'; _progress = 0.25; });
+    StreamManifest manifest;
+    try {
+      manifest = await yt.videos.streams.getManifest(VideoId(videoId),
+        ytClients: [YoutubeApiClient.androidVr, YoutubeApiClient.safari, YoutubeApiClient.ios]);
+    } catch (_) { manifest = await yt.videos.streams.getManifest(VideoId(videoId)); }
+    StreamInfo? info;
+    String filePath;
+    if (manifest.muxed.isNotEmpty) {
+      info = manifest.muxed.sortByVideoQuality().first;
+      filePath = '$savePath/$safe.mp4';
+      setState(() { _status = 'Завантажую відео 360p...'; _progress = 0.30; });
+    } else if (manifest.audioOnly.isNotEmpty) {
+      info = manifest.audioOnly.withHighestBitrate();
+      filePath = '$savePath/$safe.mp4';
+      setState(() { _status = 'Завантажую аудіо...'; _progress = 0.30; });
+    } else {
+      setState(() { _status = '❌ Немає стрімів'; _loading = false; _progress = 0; }); return;
+    }
+    final total = info.size.totalBytes;
+    var recv = 0;
+    final sink = File(filePath).openWrite();
+    await for (final chunk in yt.videos.streams.get(info)) {
+      sink.add(chunk); recv += chunk.length;
+      if (mounted) {
+        final p = total > 0 ? 0.30 + (recv / total) * 0.65 : (recv / (30*1024*1024)).clamp(0.30, 0.95);
+        setState(() {
+          _progress = p;
+          _progressText = '${(recv/1024/1024).toStringAsFixed(1)}${total > 0 ? ' / ${(total/1024/1024).toStringAsFixed(1)} MB' : ' MB'}';
+        });
+      }
+    }
+    await sink.flush(); await sink.close();
+    final size = await File(filePath).length();
+    if (size < 10000) {
+      try { await File(filePath).delete(); } catch (_) {}
+      setState(() { _status = '❌ Порожній файл'; _loading = false; _progress = 0; }); return;
+    }
+    setState(() {
+      _status = '✅ Завантажено!\n$safe\n(${(size/1024/1024).toStringAsFixed(1)} MB)';
+      _progress = 1.0; _progressText = ''; _loading = false;
+    });
+  }
+
+  Future<void> _downloadYtPlaylist(String url) async {
+    final plName = _plCtrl.text.trim();
+    if (plName.isEmpty) { setState(() => _status = '⚠️ Введіть назву папки плейлісту'); return; }
+    setState(() { _loading = true; _status = 'Отримую плейліст...'; _progress = 0.05; _thumbUrl = null; });
+    final yt = YoutubeExplode();
+    try {
+      final base = await getMusicDir();
+      final plDir = Directory('${base.path}/$plName');
+      if (!await plDir.exists()) await plDir.create();
+      final playlist = await yt.playlists.get(url);
+      final videos = await yt.playlists.getVideos(playlist.id).toList();
+      final total = videos.length;
+      setState(() {
+        _status = 'Знайдено: "${playlist.title}"\n$total відео';
+        _progress = 0.10;
+        _thumbUrl = videos.isNotEmpty ? videos.first.thumbnails.highResUrl : null;
+      });
+      int done = 0;
+      for (final v in videos) {
+        if (!mounted) break;
+        setState(() {
+          _status = '[${done+1}/$total] ${v.title}';
+          _progress = 0.10 + (done / total) * 0.88;
+          _progressText = '${done+1}/$total';
+        });
+        try {
+          final safe = v.title.replaceAll(RegExp(r'[<>:"/\\|?*#]'), '').trim();
+          try {
+            final t = await http.get(Uri.parse(v.thumbnails.highResUrl)).timeout(const Duration(seconds: 8));
+            if (t.statusCode == 200) await File('${plDir.path}/$safe.jpg').writeAsBytes(t.bodyBytes);
+          } catch (_) {}
+          StreamManifest manifest;
+          try {
+            manifest = await yt.videos.streams.getManifest(v.id,
+              ytClients: [YoutubeApiClient.androidVr, YoutubeApiClient.safari, YoutubeApiClient.ios]);
+          } catch (_) { manifest = await yt.videos.streams.getManifest(v.id); }
+          StreamInfo? info;
+          String fp;
+          if (manifest.muxed.isNotEmpty) {
+            info = manifest.muxed.sortByVideoQuality().first; fp = '${plDir.path}/$safe.mp4';
+          } else if (manifest.audioOnly.isNotEmpty) {
+            info = manifest.audioOnly.withHighestBitrate(); fp = '${plDir.path}/$safe.mp4';
+          } else { done++; continue; }
+          final sink = File(fp).openWrite();
+          await for (final chunk in yt.videos.streams.get(info)) { sink.add(chunk); }
+          await sink.flush(); await sink.close();
+        } catch (_) {}
+        done++;
+      }
+      setState(() {
+        _status = '✅ Плейліст "$plName" завантажено!\n$done/$total відео';
+        _progress = 1.0; _progressText = ''; _loading = false;
+      });
+      widget.onSongAdded();
+    } catch (e) {
+      setState(() { _status = '❌ Помилка: $e'; _loading = false; _progress = 0; });
+    } finally { yt.close(); }
+  }
+
+  Future<void> _downloadTikTok(String url) async {
+    setState(() { _loading = true; _status = 'Підключаюсь до TikTok...'; _progress = 0.05; _thumbUrl = null; });
+    try {
+      final dir = await getMusicDir();
+      final r = await http.post(Uri.parse('https://www.tikwm.com/api/'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0 (Linux; Android 13)'},
+        body: 'url=${Uri.encodeComponent(url)}&count=12&cursor=0&web=1&hd=1',
+      ).timeout(const Duration(seconds: 20));
+      if (r.statusCode != 200) throw Exception('tikwm статус ${r.statusCode}');
+      final d = jsonDecode(r.body);
+      if (d['code'] != 0) throw Exception('tikwm: ${d['msg']}');
+      final data = d['data'] as Map<String, dynamic>;
+      final title = (data['title'] as String? ?? 'TikTok').replaceAll(RegExp(r'[<>:"/\\|?*#]'), '').trim();
+      final safe = title.length > 50 ? title.substring(0, 50) : title;
+      final dlUrl = data['music_info']?['play'] as String? ?? data['wmplay'] as String? ?? data['play'] as String?;
+      final cover = data['cover'] as String?;
+      if (cover != null) {
+        setState(() => _thumbUrl = cover);
+        try {
+          final t = await http.get(Uri.parse(cover)).timeout(const Duration(seconds: 8));
+          if (t.statusCode == 200) await File('${dir.path}/$safe.jpg').writeAsBytes(t.bodyBytes);
+        } catch (_) {}
+      }
+      if (dlUrl == null) throw Exception('Немає посилання');
+      setState(() { _status = 'Знайдено: $title\nЗавантажую...'; _progress = 0.30; });
+      final ext = dlUrl.contains('.mp3') ? 'mp3' : 'mp4';
+      final req = http.Request('GET', Uri.parse(dlUrl));
+      req.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 13)';
+      req.headers['Referer'] = 'https://www.tiktok.com/';
+      final resp = await req.send().timeout(const Duration(minutes: 10));
+      final totalB = resp.contentLength ?? 0;
+      var recv = 0;
+      final sink = File('${dir.path}/$safe.$ext').openWrite();
+      await for (final chunk in resp.stream) {
+        sink.add(chunk); recv += chunk.length;
+        if (mounted) {
+          final p = totalB > 0 ? 0.30 + (recv / totalB) * 0.70 : (recv / (20*1024*1024)).clamp(0.30, 0.95);
+          setState(() { _progress = p; _progressText = '${(recv/1024/1024).toStringAsFixed(1)} MB'; });
+        }
+      }
+      await sink.flush(); await sink.close();
+      final size = await File('${dir.path}/$safe.$ext').length();
+      if (size < 5000) throw Exception('Файл порожній');
+      setState(() {
+        _status = '✅ Завантажено!\n$title\n(${(size/1024/1024).toStringAsFixed(1)} MB)';
+        _progress = 1.0; _progressText = ''; _loading = false;
+      });
+      widget.onSongAdded();
+    } catch (e) {
+      setState(() { _status = '❌ Помилка: $e'; _loading = false; _progress = 0; });
+    }
+  }
+}
+
+class _BottomNav extends StatelessWidget {
+  final int current; final Function(int) onChange;
+  const _BottomNav({required this.current, required this.onChange});
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(color: Color(0xFF12121A),
+      border: Border(top: BorderSide(color: Color(0xFF2A2A40)))),
+    child: SafeArea(top: false, child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+        _NavItem(icon: Icons.music_note_rounded, label: 'Пісні', active: current == 0, onTap: () => onChange(0)),
+        _NavItem(icon: Icons.download_rounded, label: 'Завантажити', active: current == 1, onTap: () => onChange(1)),
+      ]))));
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon; final String label; final bool active; final VoidCallback onTap;
+  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(onTap: onTap,
+    child: AnimatedContainer(duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFF7C5CFC).withOpacity(0.15) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12)),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: active ? const Color(0xFF7C5CFC) : const Color(0xFF6A6A88), size: 26),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 11,
+          color: active ? const Color(0xFF7C5CFC) : const Color(0xFF6A6A88),
+          fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+      ])));
+}
