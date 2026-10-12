@@ -10,6 +10,7 @@ import 'backup_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../theme/personalization.dart';
+import '../platform_utils.dart';
 
 // ================================================================
 // AERO GLASS DESIGN SYSTEM
@@ -193,7 +194,7 @@ class _AeroSidebar extends StatelessWidget {
                 color: AeroColors.glow,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: AeroColors.glassBorder, width: 0.5)),
-              child: Text('v5.1',
+              child: Text('v5.2',
                 style: TextStyle(color: AeroColors.primary, fontSize: 9, fontFamily: 'monospace')))),
         ])),
       if (testMode)
@@ -726,7 +727,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ]));
           }).toList()),
 
-          if (Platform.isAndroid) ...[
+          if (isMobilePlatform) ...[
             const SizedBox(height: 24),
             const Text('ІНШЕ', style: TextStyle(
               fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF6A6A88), letterSpacing: 0.5)),
@@ -789,7 +790,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: _onVersionTextTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text('${AppConfig.displayName} v5.1', style: const TextStyle(color: Color(0x886A6A88), fontSize: 12)))),
+          child: Text('${AppConfig.displayName} v5.2', style: const TextStyle(color: Color(0x886A6A88), fontSize: 12)))),
       const SizedBox(height: 10),
       AeroGlass(
         padding: const EdgeInsets.all(10),
@@ -815,7 +816,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             setState(() {});
             widget.onWallpaperChanged?.call();
           }),
-        if (Platform.isAndroid)
+        if (isMobilePlatform)
           _SettingsTile(
             icon: Icons.smartphone_rounded, iconColor: const Color(0xFFFF9800),
             title: 'Стиль мініплеєра',
@@ -844,7 +845,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       const SizedBox(height: 16),
 
       _SettingsSection(title: 'ДИЗАЙН', children: [
-        if (Platform.isAndroid)
+        if (isMobilePlatform)
           _SettingsTile(
             icon: Icons.image_rounded,
             iconColor: const Color(0xFF4CAF50),
@@ -865,7 +866,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               final picker = ImagePicker();
               final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
               if (img != null) {
-                await AppConfig.setBgImagePath(img.path);
+                await AppConfig.setBgImagePath(await persistPickedImage(img.path, 'bg_image'));
                 setState(() {});
                 widget.onWallpaperChanged?.call();
               }
@@ -918,13 +919,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       _SettingsSection(title: 'ПРО ДОДАТОК', children: [
         _SettingsTile(icon: Icons.info_outline_rounded, iconColor: const Color(0xFF4CAF50),
-          title: 'Версія', subtitle: 'pro420x1kmuxsk v5.1 (${Platform.isAndroid ? "Android" : "Windows"})'),
+          title: 'Версія', subtitle: 'pro420x1kmuxsk v5.2 ($platformLabel)'),
         _SettingsTile(icon: Icons.folder_rounded, iconColor: AeroColors.secondary,
           title: 'Папка музики', subtitle: AppConfig.musicDirDisplay),
         _SettingsTile(icon: Icons.save_rounded, iconColor: AeroColors.primary,
           title: 'Конфіг', subtitle: AppConfig.cfgPathDisplay),
         _SettingsTile(icon: Icons.code_rounded, iconColor: AeroColors.primary,
-          title: 'Фреймворк', subtitle: 'Flutter 3.41.9 • ${Platform.isAndroid ? "Android" : "Windows x64"}'),
+          title: 'Фреймворк', subtitle: 'Flutter 3.41.9 • ${Platform.isWindows ? "Windows x64" : platformLabel}'),
       ]),
     ]));
 }

@@ -8,6 +8,24 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
+      - name: Patch Info.plist for iOS (files, background audio, photos, Google login)
+        script: |
+          PLIST=ios/Runner/Info.plist
+          PB=/usr/libexec/PlistBuddy
+          # Видимість музики в застосунку "Файли"
+          $PB -c "Add :UIFileSharingEnabled bool true" $PLIST || $PB -c "Set :UIFileSharingEnabled true" $PLIST || true
+          $PB -c "Add :LSSupportsOpeningDocumentsInPlace bool true" $PLIST || $PB -c "Set :LSSupportsOpeningDocumentsInPlace true" $PLIST || true
+          # Відтворення у фоні (екран заблоковано / застосунок згорнуто)
+          $PB -c "Add :UIBackgroundModes array" $PLIST || true
+          $PB -c "Add :UIBackgroundModes:0 string audio" $PLIST || true
+          # Доступ до галереї (обкладинка, фон)
+          $PB -c "Add :NSPhotoLibraryUsageDescription string Потрібен для вибору обкладинки та фонового зображення" $PLIST || true
+          # Повернення після входу через Google (OAuth redirect scheme)
+          $PB -c "Add :CFBundleURLTypes array" $PLIST || true
+          $PB -c "Add :CFBundleURLTypes:0 dict" $PLIST || true
+          $PB -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" $PLIST || true
+          $PB -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string com.googleusercontent.apps.192776637060-3b1vnq9h4uh8o7h1tuds0l0hccnbehua" $PLIST || true
+          plutil -lint $PLIST
       - name: Build unsigned iOS (no codesign)
         script: |
           flutter build ios --release --no-codesign

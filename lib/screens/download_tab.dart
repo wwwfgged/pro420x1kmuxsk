@@ -19,7 +19,7 @@ class DownloadTab extends StatelessWidget {
             colors: [Color(0xFF7C5CFC), Color(0xFFFC5C9C)]).createShader(b),
           child: const Text('Завантажити',
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white))),
-        const Text('pro420x1kmuxsk v5.1',
+        const Text('pro420x1kmuxsk v5.2',
           style: TextStyle(color: Color(0xFF6A6A88), fontSize: 11)),
       ])),
     Expanded(child: UniversalDownloader(onSongAdded: onSongAdded)),

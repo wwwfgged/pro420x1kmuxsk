@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../config/app_config.dart';
+import '../platform_utils.dart';
 import '../google_drive_service.dart';
 
 /// Wizard першого запуску: вітання → де зберігається музика →
@@ -213,7 +214,7 @@ class _BgImagePickerInline extends StatelessWidget {
     borderRadius: BorderRadius.circular(12),
     onTap: () async {
       final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
-      if (img != null) { await AppConfig.setBgImagePath(img.path); onChanged(); }
+      if (img != null) { await AppConfig.setBgImagePath(await persistPickedImage(img.path, 'bg_image')); onChanged(); }
     },
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

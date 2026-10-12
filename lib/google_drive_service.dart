@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'platform_utils.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'models/song.dart';
 import 'download_core.dart';
@@ -31,7 +32,7 @@ class GoogleDriveService {
   static String? _androidTokenDir;
 
   static String get _tokenFilePath {
-    if (Platform.isAndroid) {
+    if (isMobilePlatform) {
       final dir = _androidTokenDir ?? '.';
       return '$dir/google_token.json';
     }
@@ -47,7 +48,7 @@ class GoogleDriveService {
 
   /// Завантажити збережений токен при старті застосунку (якщо є).
   static Future<void> loadSaved() async {
-    if (Platform.isAndroid) {
+    if (isMobilePlatform) {
       try {
         final dir = await getApplicationDocumentsDirectory();
         _androidTokenDir = dir.path;

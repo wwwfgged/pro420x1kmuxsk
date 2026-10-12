@@ -1,8 +1,9 @@
 ﻿import 'dart:io';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
+import '../platform_utils.dart';
 
-/// Конфігурація додатку pro420x1kmuxsk v5.1 (Windows)
+/// Конфігурація додатку pro420x1kmuxsk v5.2 (Windows)
 /// 
 /// Ключі запуску:
 ///   --help        Показати список ключів
@@ -20,7 +21,7 @@ class AppConfig {
 
   // На Android за замовчуванням мобільний UI (SongsTab), на Windows —
   // ПК-розкладка (SongsTabDesktop). --linold перемикає вручну.
-  static bool _desktopLayout = !Platform.isAndroid;
+  static bool _desktopLayout = !isMobilePlatform;
   static bool get desktopLayout => _desktopLayout;
 
   static bool _wallpaperBg = false;
@@ -103,10 +104,10 @@ class AppConfig {
   /// Уніфікований доступ до фонового зображення незалежно від
   /// платформи — щоб UI-код (main.dart) не розгалужувався сам.
   static bool get hasCustomBackground =>
-      Platform.isAndroid ? _bgImagePath != null : (_wallpaperBg && _wallpaperPath != null);
+      isMobilePlatform ? _bgImagePath != null : (_wallpaperBg && _wallpaperPath != null);
 
   static String? get backgroundImagePath =>
-      Platform.isAndroid ? _bgImagePath : _wallpaperPath;
+      isMobilePlatform ? _bgImagePath : _wallpaperPath;
 
   static Future<void> setBgImagePath(String? path) async {
     _bgImagePath = path;
@@ -119,7 +120,7 @@ class AppConfig {
   static String? _androidCfgDir;
 
   static String get _cfgPath {
-    if (Platform.isAndroid) {
+    if (isMobilePlatform) {
       final dir = _androidCfgDir ?? '.';
       return '$dir/config.json';
     }
@@ -136,7 +137,10 @@ class AppConfig {
   static String get cfgPathDisplay => _cfgPath;
 
   static String get musicDirDisplay {
-    if (Platform.isAndroid) {
+    if (Platform.isIOS) {
+      return 'Файли → На iPhone → pro420x1kmuxsk';
+    }
+    if (isMobilePlatform) {
       return 'Android/data/.../files/pro420x1kmuxsk';
     }
     final userProfile = Platform.environment['USERPROFILE'] ?? 'C:/Users/user';
@@ -152,7 +156,7 @@ class AppConfig {
       exit(0);
     }
 
-    if (Platform.isAndroid) {
+    if (isMobilePlatform) {
       try {
         final dir = await getApplicationDocumentsDirectory();
         _androidCfgDir = dir.path;
@@ -166,7 +170,7 @@ class AppConfig {
       final file = File(_cfgPath);
       if (await file.exists()) {
         final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-        _desktopLayout = json['desktopLayout'] as bool? ?? true;
+        _desktopLayout = json['desktopLayout'] as bool? ?? !isMobilePlatform;
         _firstLaunchDone = json['firstLaunchDone'] as bool? ?? false;
         _themeName = json['themeName'] as String? ?? 'purple';
         _customAppName = json['customAppName'] as String?;
@@ -210,7 +214,7 @@ class AppConfig {
   static void _printHelp() {
     print('''
 ╔══════════════════════════════════════════════╗
-║        pro420x1kmuxsk v5.1 (Windows)        ║
+║        pro420x1kmuxsk v5.2 (Windows)        ║
 ╚══════════════════════════════════════════════╝
 
 Використання:

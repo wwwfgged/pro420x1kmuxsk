@@ -26,6 +26,11 @@ Future<Directory> getMusicDir() async {
     } else {
       dir = Directory('${base.path}/pro420x1kmuxsk');
     }
+  } else if (Platform.isIOS) {
+    // iOS: тільки пісочниця застосунку. Documents видно в застосунку
+    // "Файли" (при UIFileSharingEnabled у Info.plist).
+    final docs = await getApplicationDocumentsDirectory();
+    dir = Directory('${docs.path}/pro420x1kmuxsk');
   } else if (Platform.isWindows) {
     final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.';
     dir = Directory('$home/Music/muzik420');
@@ -73,16 +78,27 @@ Future<String?> downloadYoutubeVideo(String url, {ProgressCb? onProgress}) async
     } catch (_) { manifest = await yt.videos.streams.getManifest(video.id); }
 
     StreamInfo? info;
+    String ext = 'mp4';
     if (manifest.muxed.isNotEmpty) {
       info = manifest.muxed.sortByVideoQuality().first;
     } else if (manifest.audioOnly.isNotEmpty) {
-      info = manifest.audioOnly.withHighestBitrate();
+      // Тільки аудіо: віддаємо перевагу AAC у mp4-контейнері (.m4a) —
+      // його відтворює і iOS (AVPlayer). Раніше тут міг братись webm/opus
+      // і зберігатись під іменем .mp4 — на iPhone такий файл не грався.
+      final mp4Audio = manifest.audioOnly.where((s) => s.container == StreamContainer.mp4).toList();
+      if (mp4Audio.isNotEmpty) {
+        info = mp4Audio.withHighestBitrate();
+        ext = 'm4a';
+      } else {
+        info = manifest.audioOnly.withHighestBitrate();
+        ext = 'webm';
+      }
     } else {
       onProgress?.call('❌ Немає стрімів', 0);
       return null;
     }
 
-    final filePath = '${saveDir.path}/$safe.mp4';
+    final filePath = '${saveDir.path}/$safe.$ext';
     final total = info.size.totalBytes;
     var recv = 0;
     final sink = File(filePath).openWrite();

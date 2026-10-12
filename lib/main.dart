@@ -667,6 +667,12 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
       child: _buildContent(context));
   }
 
+  /// iPhone з вирізом/Dynamic Island: вкладки без власного SafeArea
+  /// (Завантаження, Налаштування, десктопна розкладка) наповзали б на
+  /// статус-бар. На Android/Windows нічого не змінюємо.
+  Widget _iosTop(Widget child) =>
+      Platform.isIOS ? SafeArea(bottom: false, child: child) : child;
+
   Widget _buildContent(BuildContext context) {
     if (!_booted) return const _BootSplash();
     // Екран першого запуску тепер вимкнений за замовчуванням — показується
@@ -705,7 +711,7 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             body: Stack(children: [
             Column(children: [
               Expanded(child: IndexedStack(index: _tab, children: [
-                AppConfig.desktopLayout ? SongsTabDesktop(
+                AppConfig.desktopLayout ? _iosTop(SongsTabDesktop(
                   songs: _songs,
                   playlists: _playlists,
                   currentSong: _currentSong,
@@ -719,7 +725,7 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                   onDeletePlaylist: _deletePlaylist,
                   onVersionTap: _onVersionTap,
                   onSettings: () => setState(() => _tab = 2),
-                ) : SongsTab(
+                )) : SongsTab(
                   songs: _songs,
                   playlists: _playlists,
                   currentSong: _currentSong,
@@ -733,10 +739,10 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                   onDeletePlaylist: _deletePlaylist,
                   onVersionTap: _onVersionTap,
                 ),
-                DownloadTab(onSongAdded: _loadAll),
-                SettingsScreen(onEasterEgg: _openMiniDoom,
+                _iosTop(DownloadTab(onSongAdded: _loadAll)),
+                _iosTop(SettingsScreen(onEasterEgg: _openMiniDoom,
                   songs: _songs, playlists: _playlists, onDataChanged: _loadAll,
-                  onWallpaperChanged: () => setState(() {})),
+                  onWallpaperChanged: () => setState(() {}))),
               ])),
               // На Android мініплеєр докований у звичайному потоці —
               // прямо над нижньою навігацією (не поверх neї), без
