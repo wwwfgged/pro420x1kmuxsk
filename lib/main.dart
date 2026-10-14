@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'player.dart';
 import 'widgets/mobile_player.dart';
+import 'widgets/ui_animations.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_theme.dart';
 import 'win_theme.dart';
@@ -711,7 +712,9 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             body: Stack(children: [
             Column(children: [
               Expanded(child: IndexedStack(index: _tab, children: [
-                AppConfig.desktopLayout ? _iosTop(SongsTabDesktop(
+                AnimatedTabVisibility(
+                  active: _tab == 0,
+                  child: AppConfig.desktopLayout ? _iosTop(SongsTabDesktop(
                   songs: _songs,
                   playlists: _playlists,
                   currentSong: _currentSong,
@@ -739,10 +742,17 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                   onDeletePlaylist: _deletePlaylist,
                   onVersionTap: _onVersionTap,
                 ),
-                _iosTop(DownloadTab(onSongAdded: _loadAll)),
-                _iosTop(SettingsScreen(onEasterEgg: _openMiniDoom,
+                ),
+                AnimatedTabVisibility(
+                  active: _tab == 1,
+                  child: _iosTop(DownloadTab(onSongAdded: _loadAll)),
+                ),
+                AnimatedTabVisibility(
+                  active: _tab == 2,
+                  child: _iosTop(SettingsScreen(onEasterEgg: _openMiniDoom,
                   songs: _songs, playlists: _playlists, onDataChanged: _loadAll,
                   onWallpaperChanged: () => setState(() {}))),
+                ),
               ])),
               // На Android мініплеєр докований у звичайному потоці —
               // прямо над нижньою навігацією (не поверх neї), без
