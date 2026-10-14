@@ -14,7 +14,9 @@ class SongTile extends StatelessWidget {
     required this.onTap, required this.onMenu, this.indent = false});
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 180),
+    curve: Curves.easeOutCubic,
     margin: EdgeInsets.only(bottom: 8, left: indent ? 8 : 0),
     decoration: BoxDecoration(
       color: active ? const Color(0xFF7C5CFC).withOpacity(0.15) : const Color(0xFF0F0F1A),
@@ -22,7 +24,12 @@ class SongTile extends StatelessWidget {
       border: Border.all(color: active ? const Color(0xFF7C5CFC).withOpacity(0.4) : const Color(0xFF2A2A40))),
     child: ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: ListDensity.verticalPadding),
-      leading: SongCover(coverPath: song.coverPath, active: active, size: ListDensity.coverSize),
+      leading: AnimatedScale(
+        scale: active ? 1.04 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: SongCover(coverPath: song.coverPath, active: active, size: ListDensity.coverSize),
+      ),
       title: Text(song.title, style: TextStyle(fontWeight: FontWeight.w600,
         color: active ? const Color(0xFF7C5CFC) : Colors.white, fontSize: ListDensity.titleFontSize),
         maxLines: 1, overflow: TextOverflow.ellipsis),
