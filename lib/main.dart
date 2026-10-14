@@ -757,16 +757,29 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
               // На Android мініплеєр докований у звичайному потоці —
               // прямо над нижньою навігацією (не поверх neї), без
               // ручного розрахунку відступів.
-              if (!Platform.isWindows && _currentSong != null)
-                MobileMiniPlayer(
-                  song: _currentSong!,
-                  isPlaying: _isPlaying,
-                  position: _position,
-                  duration: _duration,
-                  onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                  onNext: _playNext,
-                  onPrev: _playPrev,
-                  onStop: _stopPlayer,
+              if (!Platform.isWindows)
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => SizeTransition(
+                    sizeFactor: animation,
+                    axisAlignment: -1,
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: _currentSong == null
+                      ? const SizedBox.shrink(key: ValueKey('no-mobile-mini-player'))
+                      : MobileMiniPlayer(
+                          key: const ValueKey('mobile-mini-player'),
+                          song: _currentSong!,
+                          isPlaying: _isPlaying,
+                          position: _position,
+                          duration: _duration,
+                          onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                          onNext: _playNext,
+                          onPrev: _playPrev,
+                          onStop: _stopPlayer,
+                        ),
                 ),
               AeroBottomNav(current: _tab, onChange: (i) => setState(() => _tab = i)),
             ]),
