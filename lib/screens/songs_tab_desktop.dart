@@ -194,7 +194,7 @@ class _AeroSidebar extends StatelessWidget {
                 color: AeroColors.glow,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: AeroColors.glassBorder, width: 0.5)),
-              child: Text('v5.2',
+              child: Text('v5.3',
                 style: TextStyle(color: AeroColors.primary, fontSize: 9, fontFamily: 'monospace')))),
         ])),
       if (testMode)
@@ -790,7 +790,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: _onVersionTextTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text('${AppConfig.displayName} v5.2', style: const TextStyle(color: Color(0x886A6A88), fontSize: 12)))),
+          child: Text('${AppConfig.displayName} v5.3', style: const TextStyle(color: Color(0x886A6A88), fontSize: 12)))),
       const SizedBox(height: 10),
       AeroGlass(
         padding: const EdgeInsets.all(10),
@@ -919,7 +919,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       _SettingsSection(title: 'ПРО ДОДАТОК', children: [
         _SettingsTile(icon: Icons.info_outline_rounded, iconColor: const Color(0xFF4CAF50),
-          title: 'Версія', subtitle: 'pro420x1kmuxsk v5.2 ($platformLabel)'),
+          title: 'Версія', subtitle: 'pro420x1kmuxsk v5.3 ($platformLabel)'),
         _SettingsTile(icon: Icons.folder_rounded, iconColor: AeroColors.secondary,
           title: 'Папка музики', subtitle: AppConfig.musicDirDisplay),
         _SettingsTile(icon: Icons.save_rounded, iconColor: AeroColors.primary,

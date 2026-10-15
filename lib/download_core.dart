@@ -56,7 +56,16 @@ Future<String?> downloadYoutubeVideo(String url, {ProgressCb? onProgress}) async
     final base = await getMusicDir();
     onProgress?.call('Підключаюсь...', 0.05);
     final video = await yt.videos.get(url);
-    final safe = video.title.replaceAll(RegExp(r'[<>:"/\\|?*#]'), '').trim();
+    var safe = video.title.replaceAll(RegExp(r'[<>:"/\\|?*#]'), '').trim();
+    // Ліміт імені файлу в iOS/Android — 255 БАЙТ, а кирилиця = 2 байти на
+    // символ: довга назва з YouTube просто не створювала файл.
+    if (safe.length > 80) {
+      safe = safe.substring(0, 80);
+      final last = safe.codeUnitAt(safe.length - 1);
+      if (last >= 0xD800 && last <= 0xDBFF) safe = safe.substring(0, safe.length - 1); // не різати емодзі навпіл
+      safe = safe.trim();
+    }
+    if (safe.isEmpty) safe = 'track_${DateTime.now().millisecondsSinceEpoch}';
     onProgress?.call('Знайдено: ${video.title}', 0.15);
 
     Directory saveDir = base;
