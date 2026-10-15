@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 
+import 'audio_sniff.dart';
+
 /// Помилка відтворення з уже готовим текстом для користувача
 /// (показується в червоному SnackBar з main.dart → _playSong).
 class PlayerError implements Exception {
@@ -106,10 +108,21 @@ class IosPlayer {
     if (await file.length() == 0) {
       throw PlayerError('Файл порожній (0 байт): $name — завантаж пісню ще раз');
     }
-    final lower = filePath.toLowerCase();
-    if (lower.endsWith('.webm') || lower.endsWith('.ogg') || lower.endsWith('.opus')) {
+    // Реальний формат за вмістом файлу. AVPlayer довіряє розширенню, тому
+    // mp3/aac під іменем .mp4 (так зберігались TikTok-звуки) дає помилку
+    // -11829. Для таких файлів граємо тимчасову копію з правильним
+    // розширенням — старі завантаження працюють без повторного скачування.
+    final real = await sniffAudioExt(filePath);
+    if (real == 'webm' || real == 'ogg' || extensionOf(filePath) == 'opus') {
       throw PlayerError('iPhone не відтворює webm/ogg/opus: $name. '
           'Завантаж пісню ще раз — нова версія зберігає .m4a/.mp4');
+    }
+    var playPath = filePath;
+    if (real != null && !sameAudioKind(extensionOf(filePath), real)) {
+      final size = await file.length();
+      final tmp = File('${Directory.systemTemp.path}/ios_play_${filePath.hashCode.abs()}_$size.$real');
+      if (!await tmp.exists()) await file.copy(tmp.path);
+      playPath = tmp.path;
     }
 
     await _ensureSession();
@@ -117,7 +130,7 @@ class IosPlayer {
     try {
       await p.stop();
       await p
-          .setAudioSource(AudioSource.uri(Uri.file(filePath)))
+          .setAudioSource(AudioSource.uri(Uri.file(playPath)))
           .timeout(const Duration(seconds: 20));
       // НЕ await: цей Future завершується, коли трек догра́є.
       unawaited(p.play().catchError((Object e) => print('[IosPlayer] play error: $e')));
@@ -125,7 +138,8 @@ class IosPlayer {
     } on PlayerInterruptedException {
       // Запустили інший трек поки вантажився цей — це нормально.
     } on PlayerException catch (e) {
-      throw PlayerError('iOS не зміг відтворити "$name" (код ${e.code}): ${e.message ?? "без опису"}');
+      throw PlayerError('iOS не зміг відтворити "$name" (код ${e.code}): ${e.message ?? "без опису"}. '
+          'Формат за вмістом: ${real ?? "невідомий"}, розширення: .${extensionOf(filePath)}');
     } on TimeoutException {
       throw PlayerError('Таймаут: трек "$name" не завантажився за 20 с');
     }

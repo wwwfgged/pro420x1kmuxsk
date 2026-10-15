@@ -74,7 +74,7 @@ class SongsTab extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
-              child: Text('v5.3',
+              child: Text('v5.4',
                 style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontFamily: 'monospace')),
             ),
           ),

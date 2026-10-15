@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'models/song.dart';
+import 'audio_sniff.dart';
 
 /// Кешуємо обчислену теку один раз за сесію — на Android
 /// getExternalStorageDirectory() асинхронний і не варто дьоргати
@@ -107,7 +108,7 @@ Future<String?> downloadYoutubeVideo(String url, {ProgressCb? onProgress}) async
       return null;
     }
 
-    final filePath = '${saveDir.path}/$safe.$ext';
+    var filePath = '${saveDir.path}/$safe.$ext';
     final total = info.size.totalBytes;
     var recv = 0;
     final sink = File(filePath).openWrite();
@@ -124,6 +125,7 @@ Future<String?> downloadYoutubeVideo(String url, {ProgressCb? onProgress}) async
       onProgress?.call('❌ Порожній файл', 0);
       return null;
     }
+    filePath = await fixAudioExtension(filePath);
 
     try {
       final sourcesFile = File('${base.path}/${SourceStore.fileNameOf()}');
@@ -180,7 +182,7 @@ Future<String?> downloadTikTokVideo(String url, {ProgressCb? onProgress}) async 
     final resp = await req.send().timeout(const Duration(minutes: 10));
     final totalB = resp.contentLength ?? 0;
     var recv = 0;
-    final filePath = '${saveDir.path}/$safe.$ext';
+    var filePath = '${saveDir.path}/$safe.$ext';
     final sink = File(filePath).openWrite();
     await for (final chunk in resp.stream) {
       sink.add(chunk); recv += chunk.length;
@@ -190,6 +192,8 @@ Future<String?> downloadTikTokVideo(String url, {ProgressCb? onProgress}) async 
     await sink.flush(); await sink.close();
     final size = await File(filePath).length();
     if (size < 5000) throw Exception('Файл порожній');
+    // TikTok-звук приходить як голий mp3/aac — виправляємо розширення за вмістом.
+    filePath = await fixAudioExtension(filePath);
 
     try {
       final sourcesFile = File('${base.path}/${SourceStore.fileNameOf()}');

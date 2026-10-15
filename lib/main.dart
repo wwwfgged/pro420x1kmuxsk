@@ -626,7 +626,8 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     final doomCmds = ['chocolate-doom', 'gzdoom', 'doom'];
     String? found;
     for (final cmd in doomCmds) {
-      final result = await Process.run('which', [cmd]).catchError((_) => null);
+      ProcessResult? result;
+      try { result = await Process.run('which', [cmd]); } catch (_) {}
       if (result != null && result.exitCode == 0) { found = cmd; break; }
     }
     if (found != null) {
