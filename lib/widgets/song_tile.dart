@@ -19,7 +19,7 @@ class SongTile extends StatelessWidget {
     decoration: BoxDecoration(
       color: active ? const Color(0xFF7C5CFC).withOpacity(0.15) : const Color(0xFF0F0F1A),
       borderRadius: BorderRadius.circular(AppRadius.card),
-      border: Border.all(color: active ? const Color(0xFF7C5CFC).withOpacity(0.4) : const Color(0xFF2A2A40))),
+      border: Border.all(color: active ? const Color(0xFF7C5CFC).withOpacity(0.4) : Colors.transparent)),
     child: ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: ListDensity.verticalPadding),
       leading: SongCover(coverPath: song.coverPath, active: active, size: ListDensity.coverSize),

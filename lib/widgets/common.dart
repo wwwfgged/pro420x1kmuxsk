@@ -122,7 +122,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
       decoration: BoxDecoration(
         color: hasActive ? const Color(0xFF7C5CFC).withOpacity(0.1) : const Color(0xFF12121A),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: hasActive ? const Color(0xFF7C5CFC).withOpacity(0.4) : const Color(0xFF2A2A40))),
+        border: Border.all(color: hasActive ? const Color(0xFF7C5CFC).withOpacity(0.4) : Colors.transparent)),
       child: Column(children: [
         InkWell(borderRadius: BorderRadius.circular(16),
           onTap: () => setState(() => _expanded = !_expanded),
