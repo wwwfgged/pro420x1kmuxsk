@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -312,13 +312,33 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Wi
       }
 
       // Плейлисти: один спільний playlists.txt (muzikmen блоки)
+      // Завантажуємо плейлісти з playlists.txt.
       final plFile = await _playlistsFile();
       final entries = await PlaylistStore.readAll(plFile);
       for (final entry in entries) {
         final plSongs = <Song>[];
         for (final path in entry.paths) {
-          final match = songs.where((s) => s.filePath == path);
-          if (match.isNotEmpty) plSongs.add(match.first);
+          Song? matched;
+          for (final s in songs) {
+            if (s.filePath == path) { matched = s; break; }
+          }
+          if (matched == null) {
+            final want = basenameOf(path).toLowerCase();
+            for (final s in songs) {
+              if (basenameOf(s.filePath).toLowerCase() == want) { matched = s; break; }
+            }
+          }
+          if (matched == null) {
+            final wantBase = stripAudioExt(basenameOf(path)).toLowerCase();
+            if (wantBase.isNotEmpty) {
+              for (final s in songs) {
+                if (stripAudioExt(basenameOf(s.filePath)).toLowerCase() == wantBase) { matched = s; break; }
+              }
+            }
+          }
+          if (matched != null && !plSongs.any((s) => s.filePath == matched!.filePath)) {
+            plSongs.add(matched);
+          }
         }
         playlists.add(MusicPlaylist(name: entry.name, songs: plSongs));
       }
