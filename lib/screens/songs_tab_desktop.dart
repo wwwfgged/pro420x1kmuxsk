@@ -764,12 +764,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'unknown';
       }
 
-      List<int> parseVersion(String s) {
-        final m = RegExp(r'(\d+(?:\.\d+){0,3})').firstMatch(s);
-        if (m == null) return [0];
-        return m.group(1)!.split('.').map((p) => int.tryParse(p) ?? 0).toList();
-      }
-
       int cmpVer(List<int> a, List<int> b) {
         final n = a.length > b.length ? a.length : b.length;
         for (var i = 0; i < n; i++) {
@@ -778,6 +772,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (av != bv) return av.compareTo(bv);
         }
         return 0;
+      }
+
+      List<int> parseVersion(String s) {
+        // Рахуємо лише версії з крапкою (6.0.0, 5.4, ...). Одиночне число
+        // "420" із назви репозиторію pro420x1kmuxsk не має сприйматися
+        // як версія 420 (через це старі релізи показувалися як оновлення).
+        final matches = RegExp(r'(?:v)?(\d+(?:\.\d+){1,3})', caseSensitive: false)
+            .allMatches(s);
+        List<int> best = [0];
+        for (final m in matches) {
+          final v = m.group(1)!.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+          if (cmpVer(v, best) > 0) best = v;
+        }
+        return best;
       }
 
       bool matchesPlatform(Map<String, dynamic> r, String platform) {
@@ -835,7 +843,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           backgroundColor: const Color(0xFF12121A),
           title: const Text('Доступне оновлення', style: TextStyle(color: Colors.white)),
           content: Text(
-            'Поточна версія: v$currentStr\nПлатформа: ${platform.toUpperCase()}\nЗнайдено: ${name.isNotEmpty ? name : tag}\n\n$url',
+            'Поточна версія: v$currentStr\nВерсія релізу: v${bestVer!.join('.')}\nПлатформа: ${platform.toUpperCase()}\nЗнайдено: ${name.isNotEmpty ? name : tag}\n\n$url',
             style: const TextStyle(color: Color(0xFFCCCCDD), fontSize: 13)),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Color(0xFF7C5CFC)))),
