@@ -27,6 +27,15 @@ class AppConfig {
   static bool _wallpaperBg = false;
   static bool get wallpaperBg => _wallpaperBg;
 
+  /// Debug-перемикач: показати старий мобільний плеєр замість нового
+  /// скляного. Стандартно вимкнено — новий дизайн використовується скрізь.
+  static bool _useLegacyPlayer = false;
+  static bool get useLegacyPlayer => _useLegacyPlayer;
+  static Future<void> setUseLegacyPlayer(bool value) async {
+    _useLegacyPlayer = value;
+    await _save();
+  }
+
   static bool _firstLaunchDone = false;
   static bool get firstLaunchDone => _firstLaunchDone;
   static Future<void> markFirstLaunchDone() async {
@@ -182,6 +191,7 @@ class AppConfig {
         _listDensity = json['listDensity'] as String? ?? 'comfortable';
         _listDensityScale = (json['listDensityScale'] as num?)?.toDouble() ?? 1.0;
         _wallpaperBg = json['wallpaperBg'] as bool? ?? false;
+        _useLegacyPlayer = json['useLegacyPlayer'] as bool? ?? false;
         _bgImagePath = json['bgImagePath'] as String?;
         if (_bgImagePath != null && !File(_bgImagePath!).existsSync()) {
           _bgImagePath = null;
@@ -262,6 +272,7 @@ class AppConfig {
         'listDensityScale': _listDensityScale,
         'wallpaperBg': _wallpaperBg,
         'bgImagePath': _bgImagePath,
+        'useLegacyPlayer': _useLegacyPlayer,
       }));
     } catch (e) {
       print('[AppConfig] Save error: $e');

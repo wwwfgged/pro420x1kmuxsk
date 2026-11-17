@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'player.dart';
 import 'widgets/mobile_player.dart';
+import 'widgets/legacy_mobile_player.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_theme.dart';
 import 'win_theme.dart';
@@ -769,16 +770,27 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
               // прямо над нижньою навігацією (не поверх neї), без
               // ручного розрахунку відступів.
               if (!Platform.isWindows && _currentSong != null)
-                MobileMiniPlayer(
-                  song: _currentSong!,
-                  isPlaying: _isPlaying,
-                  position: _position,
-                  duration: _duration,
-                  onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                  onNext: _playNext,
-                  onPrev: _playPrev,
-                  onStop: _stopPlayer,
-                ),
+                AppConfig.useLegacyPlayer
+                    ? LegacyMobileMiniPlayer(
+                        song: _currentSong!,
+                        isPlaying: _isPlaying,
+                        position: _position,
+                        duration: _duration,
+                        onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                        onNext: _playNext,
+                        onPrev: _playPrev,
+                        onStop: _stopPlayer,
+                      )
+                    : MobileMiniPlayer(
+                        song: _currentSong!,
+                        isPlaying: _isPlaying,
+                        position: _position,
+                        duration: _duration,
+                        onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                        onNext: _playNext,
+                        onPrev: _playPrev,
+                        onStop: _stopPlayer,
+                      ),
               AeroBottomNav(current: _tab, onChange: (i) => setState(() => _tab = i)),
             ]),
             // На Windows — ефемерний Media Overlay (з'являється при
