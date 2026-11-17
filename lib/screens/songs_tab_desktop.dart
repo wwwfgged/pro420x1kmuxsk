@@ -197,7 +197,7 @@ class _AeroSidebar extends StatelessWidget {
                 color: AeroColors.glow,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: AeroColors.glassBorder, width: 0.5)),
-              child: Text('v6.0',
+              child: Text('v6.0.1',
                 style: TextStyle(color: AeroColors.primary, fontSize: 9, fontFamily: 'monospace')))),
         ])),
       if (testMode)
@@ -818,7 +818,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       final list = (jsonDecode(resp.body) as List<dynamic>).cast<Map<String, dynamic>>();
-      const currentStr = '6.0.0';
+      const currentStr = '6.0.1';
       final currentVer = parseVersion(currentStr);
 
       Map<String, dynamic>? best;
@@ -943,7 +943,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: _onVersionTextTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text('${AppConfig.displayName} v6.0', style: const TextStyle(color: Color(0x886A6A88), fontSize: 12)))),
+          child: Text('${AppConfig.displayName} v6.0.1', style: const TextStyle(color: Color(0x886A6A88), fontSize: 12)))),
       const SizedBox(height: 10),
       AeroGlass(
         padding: const EdgeInsets.all(10),
@@ -1072,7 +1072,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       _SettingsSection(title: 'ПРО ДОДАТОК', children: [
         _SettingsTile(icon: Icons.info_outline_rounded, iconColor: const Color(0xFF4CAF50),
-          title: 'Версія', subtitle: 'pro420x1kmuxsk v6.0 ($platformLabel)'),
+          title: 'Версія', subtitle: 'pro420x1kmuxsk v6.0.1 ($platformLabel)'),
         _SettingsTile(icon: Icons.system_update_rounded, iconColor: AeroColors.primary,
           title: 'Оновлення',
           subtitle: 'Перевірити оновлення через GitHub',

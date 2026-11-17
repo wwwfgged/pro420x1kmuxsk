@@ -34,6 +34,6 @@ workflows:
           mkdir -p build/ios/iphoneos/Payload
           cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
           cd build/ios/iphoneos
-          zip -r muzik420_unsigned.ipa Payload
+          zip -r muzik420_unsigned_v6.0.1.ipa Payload
     artifacts:
-      - build/ios/iphoneos/muzik420_unsigned.ipa
+      - build/ios/iphoneos/muzik420_unsigned_v6.0.1.ipa
