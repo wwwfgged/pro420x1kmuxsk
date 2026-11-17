@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'player.dart';
 import 'widgets/mobile_player.dart';
-import 'widgets/legacy_mobile_player.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_theme.dart';
 import 'win_theme.dart';
@@ -188,7 +187,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Wi
     Player.positionStream.listen((p) { if (mounted) setState(() => _position = p); });
     Player.durationStream.listen((d) { if (mounted && d != null) setState(() => _duration = d); });
     Player.playingStream.listen((p) { if (mounted) setState(() => _isPlaying = p); });
-    Player.completionStream.listen((_) => _playNext());
+    // На iOS автоперемикання робить нативний AVQueuePlayer — він продовжує
+    // грати навіть при заблокованому екрані, коли Dart-ізоляція призупинена.
+    if (Platform.isIOS) {
+      Player.queueIndexStream.listen((i) {
+        if (!mounted || i < 0 || i >= _queue.length || i == _currentIndex) return;
+        setState(() {
+          _currentIndex = i;
+          _currentSong = _queue[i];
+        });
+      });
+    } else {
+      Player.completionStream.listen((_) => _playNext());
+    }
   }
 
   @override
@@ -351,10 +362,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Wi
   Future<void> _playSong(Song song, {List<Song>? queue}) async {
     final q = queue ?? _songs;
     final idx = q.indexWhere((s) => s.filePath == song.filePath);
-    setState(() { _currentSong = song; _queue = List.from(q); _currentIndex = idx < 0 ? 0 : idx; });
+    final startIndex = idx < 0 ? 0 : idx;
+    setState(() { _currentSong = song; _queue = List.from(q); _currentIndex = startIndex; });
     try {
-      await Player.play(song.filePath);
-      // play called above
+      if (Platform.isIOS && q.isNotEmpty) {
+        // iOS: вся черга одразу → AVQueuePlayer перемикає треки сам у фоні.
+        await Player.playQueue(q.map((s) => s.filePath).toList(), startIndex);
+      } else {
+        await Player.play(song.filePath);
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('❌ $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
@@ -363,11 +379,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Wi
 
   void _playNext() {
     if (_queue.isEmpty || _currentIndex == null) return;
+    if (Platform.isIOS) {
+      // Нативний skip не перезавантажує файл і працює у фоновому режимі;
+      // індекс оновиться через queueIndexStream.
+      Player.skipToNext();
+      return;
+    }
     _playSong(_queue[(_currentIndex! + 1) % _queue.length], queue: _queue);
   }
 
   void _playPrev() {
     if (_queue.isEmpty || _currentIndex == null) return;
+    if (Platform.isIOS) {
+      Player.skipToPrevious();
+      return;
+    }
     _playSong(_queue[(_currentIndex! - 1 + _queue.length) % _queue.length], queue: _queue);
   }
 
@@ -788,27 +814,16 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
               // а не поверх контенту. Scaffold сам віднімає його висоту
               // від тіла — жодних ручних відступів і перекриттів.
               bottomSheet: (!Platform.isWindows && _currentSong != null)
-                  ? (AppConfig.useLegacyPlayer
-                      ? LegacyMobileMiniPlayer(
-                          song: _currentSong!,
-                          isPlaying: _isPlaying,
-                          position: _position,
-                          duration: _duration,
-                          onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                          onNext: _playNext,
-                          onPrev: _playPrev,
-                          onStop: _stopPlayer,
-                        )
-                      : MobileMiniPlayer(
-                          song: _currentSong!,
-                          isPlaying: _isPlaying,
-                          position: _position,
-                          duration: _duration,
-                          onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                          onNext: _playNext,
-                          onPrev: _playPrev,
-                          onStop: _stopPlayer,
-                        ))
+                  ? MobileMiniPlayer(
+                      song: _currentSong!,
+                      isPlaying: _isPlaying,
+                      position: _position,
+                      duration: _duration,
+                      onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                      onNext: _playNext,
+                      onPrev: _playPrev,
+                      onStop: _stopPlayer,
+                    )
                   : null,
               bottomNavigationBar:
                   AeroBottomNav(current: _tab, onChange: (i) => setState(() => _tab = i)),

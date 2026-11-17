@@ -41,11 +41,16 @@ class IosPlayer {
   static final _durationController = StreamController<Duration>.broadcast();
   static final _playingController = StreamController<bool>.broadcast();
   static final _completionController = StreamController<void>.broadcast();
+  static final _queueIndexController = StreamController<int>.broadcast();
 
   static Stream<Duration> get positionStream => _positionController.stream;
   static Stream<Duration> get durationStream => _durationController.stream;
   static Stream<bool> get playingStream => _playingController.stream;
   static Stream<void> get completionStream => _completionController.stream;
+
+  /// Нативний AVQueuePlayer повідомляє про перехід до наступного треку сам —
+  /// навіть коли екран заблокований і Dart-ізоляція призупинена.
+  static Stream<int> get queueIndexStream => _queueIndexController.stream;
 
   static bool get isPlaying => _player?.playing ?? false;
   static bool get isPaused =>
@@ -67,6 +72,11 @@ class IosPlayer {
     p.playbackEventStream.listen((_) {}, onError: onErr);
     p.processingStateStream.listen((s) {
       if (s == ProcessingState.completed) _completionController.add(null);
+    }, onError: onErr);
+    // Індекс черги змінюється нативним плеєром — це і є автоперемикання
+    /// треків у фоні, коли застосунок не активний.
+    p.currentIndexStream.listen((i) {
+      if (i != null) _queueIndexController.add(i);
     }, onError: onErr);
     return p;
   }
@@ -145,6 +155,74 @@ class IosPlayer {
     }
   }
 
+  /// Підготувати один файл черги: перевірити, виправити розширення
+  /// (старі TikTok-звуки збережені з неправильним розширенням) і зробити
+  /// AudioSource для нативного чергового плеєра.
+  static Future<AudioSource> _audioSourceFor(String filePath) async {
+    final name = filePath.split('/').last;
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw PlayerError('Файл не знайдено: $name');
+    }
+    final size = await file.length();
+    if (size == 0) {
+      throw PlayerError('Файл порожній (0 байт): $name — завантаж пісню ще раз');
+    }
+    final real = await sniffAudioExt(filePath);
+    if (real == 'webm' || real == 'ogg' || extensionOf(filePath) == 'opus') {
+      throw PlayerError('iPhone не відтворює webm/ogg/opus: $name. '
+          'Завантаж пісню ще раз — нова версія зберігає .m4a/.mp4');
+    }
+    var playPath = filePath;
+    if (real != null && !sameAudioKind(extensionOf(filePath), real)) {
+      final tmp = File('${Directory.systemTemp.path}/ios_play_${filePath.hashCode.abs()}_$size.$real');
+      if (!await tmp.exists()) await file.copy(tmp.path);
+      playPath = tmp.path;
+    }
+    return AudioSource.uri(Uri.file(playPath));
+  }
+
+  /// Задати всю чергу одразу. AVQueuePlayer сам переходить до наступного
+  /// треку по завершенню поточного — без участі Dart-коду, тому музика
+  /// не зупиняється на останньому треку при заблокованому екрані.
+  static Future<void> playQueue(List<String> paths, int index) async {
+    if (paths.isEmpty) return;
+    final start = index.clamp(0, paths.length - 1);
+
+    await _ensureSession();
+    final children = <AudioSource>[];
+    for (final path in paths) {
+      children.add(await _audioSourceFor(path));
+    }
+    final p = _ensurePlayer();
+    try {
+      await p.stop();
+      // Зациклюємо всю чергу: після останнього треку знову перший.
+      await p.setLoopMode(LoopMode.all);
+      // preload:false — не завантажуємо всю бібліотеку одразу (при 500+
+      // треках це була б помітна затримка), поточний трек підвантажиться
+      // сам при play().
+      await p.setAudioSources(children, initialIndex: start, preload: false);
+      // НЕ await: Future завершується лише коли вся черга дограє.
+      unawaited(p.play().catchError((Object e) => print('[IosPlayer] queue play error: $e')));
+      print('[IosPlayer] ▶️ queue (${paths.length} треків) з індексу $start');
+    } on PlayerInterruptedException {
+      // Запустили іншу чергу, поки готували цю — нормально.
+    } on PlayerException catch (e) {
+      throw PlayerError('iOS не зміг запустити чергу (код ${e.code}): ${e.message ?? "без опису"}');
+    }
+  }
+
+  /// Нативне перемикання в межах черги — не перезавантажує файл і не
+  /// ламає фонове відтворення.
+  static Future<void> skipToNext() async {
+    try { await _player?.seekToNext(); } catch (e) { print('[IosPlayer] skipNext error: $e'); }
+  }
+
+  static Future<void> skipToPrevious() async {
+    try { await _player?.seekToPrevious(); } catch (e) { print('[IosPlayer] skipPrev error: $e'); }
+  }
+
   static Future<void> pause() async {
     try { await _player?.pause(); } catch (e) { print('[IosPlayer] pause error: $e'); }
   }
@@ -172,6 +250,7 @@ class IosPlayer {
       _durationController.close();
       _playingController.close();
       _completionController.close();
+      _queueIndexController.close();
     } catch (e) {
       print('[IosPlayer] dispose error: $e');
     }

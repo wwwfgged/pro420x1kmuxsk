@@ -747,18 +747,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() {});        // оновити SettingsScreen
                 widget.onWallpaperChanged?.call(); // оновити MainScreen (перемкнути IndexedStack)
               }),
-            const SizedBox(height: 4),
-            _ToggleTile(
-              icon: Icons.music_note_rounded,
-              iconColor: const Color(0xFF7C5CFC),
-              title: 'Старий плеєр',
-              subtitle: 'Увімкнути старий інтерфейс плеєра (для порівняння)',
-              value: AppConfig.useLegacyPlayer,
-              onChanged: (v) async {
-                await AppConfig.setUseLegacyPlayer(v);
-                sheetSetState(() {});   // оновити перемикач у самому bottom sheet
-                widget.onWallpaperChanged?.call(); // перемалювати MainScreen — підмінити плеєр
-              }),
           ],
         ]))));
       }));

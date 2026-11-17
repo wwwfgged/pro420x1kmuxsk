@@ -24,6 +24,11 @@ class Player {
   static Stream<void> get completionStream => _by<Stream<void>>(
       () => WindowsPlayer.completionStream, () => IosPlayer.completionStream, () => AndroidPlayer.completionStream);
 
+  /// Тільки на iOS: нативний плеєр сам повідомляє про зміну треку в черзі
+  /// (потрібно для автоперемикання при заблокованому екрані).
+  static Stream<int> get queueIndexStream => _by<Stream<int>>(
+      () => const Stream<int>.empty(), () => IosPlayer.queueIndexStream, () => const Stream<int>.empty());
+
   static bool get isPlaying =>
       _by<bool>(() => WindowsPlayer.isPlaying, () => IosPlayer.isPlaying, () => AndroidPlayer.isPlaying);
   static bool get isPaused =>
@@ -35,6 +40,17 @@ class Player {
 
   static Future<void> play(String filePath) => _by<Future<void>>(
       () => WindowsPlayer.play(filePath), () => IosPlayer.play(filePath), () => AndroidPlayer.play(filePath));
+
+  /// На iOS задаємо всю чергу одразу, щоб AVQueuePlayer перемикав треки
+  /// сам. На інших платформах граємо вибраний файл звичайним способом.
+  static Future<void> playQueue(List<String> paths, int index) => _by<Future<void>>(
+      () => play(paths[index]), () => IosPlayer.playQueue(paths, index), () => play(paths[index]));
+
+  static Future<void> skipToNext() => _by<Future<void>>(
+      () => Future.value(), () => IosPlayer.skipToNext(), () => Future.value());
+
+  static Future<void> skipToPrevious() => _by<Future<void>>(
+      () => Future.value(), () => IosPlayer.skipToPrevious(), () => Future.value());
   static Future<void> pause() => _by<Future<void>>(
       () => WindowsPlayer.pause(), () => IosPlayer.pause(), () => AndroidPlayer.pause());
   static Future<void> resume() => _by<Future<void>>(
