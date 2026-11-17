@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../models/song.dart';
 import '../widgets/song_tile.dart';
 import '../config/app_config.dart';
@@ -834,17 +835,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
 
+      Future<void> openUrl(String url) async {
+        try {
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        } catch (_) {}
+      }
+
+      const releasesUrl = 'https://github.com/wwwfgged/pro420x1kmuxsk/releases';
+
       if (!mounted) return;
       if (best != null) {
         final tag = (best['tag_name'] ?? '').toString();
         final name = (best['name'] ?? tag).toString();
-        final url = (best['html_url'] ?? 'https://github.com/wwwfgged/pro420x1kmuxsk/releases').toString();
+        final url = (best['html_url'] ?? releasesUrl).toString();
         showDialog(context: context, builder: (_) => AlertDialog(
           backgroundColor: const Color(0xFF12121A),
           title: const Text('Доступне оновлення', style: TextStyle(color: Colors.white)),
-          content: Text(
-            'Поточна версія: v$currentStr\nВерсія релізу: v${bestVer!.join('.')}\nПлатформа: ${platform.toUpperCase()}\nЗнайдено: ${name.isNotEmpty ? name : tag}\n\n$url',
-            style: const TextStyle(color: Color(0xFFCCCCDD), fontSize: 13)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Поточна версія: v$currentStr\nВерсія релізу: v${bestVer!.join('.')}\nПлатформа: ${platform.toUpperCase()}\nЗнайдено: ${name.isNotEmpty ? name : tag}',
+                style: const TextStyle(color: Color(0xFFCCCCDD), fontSize: 13)),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => openUrl(url),
+                child: const Text('Відкрити реліз →',
+                  style: TextStyle(color: Color(0xFF7C5CFC), fontSize: 13,
+                    decoration: TextDecoration.underline)),
+              ),
+            ],
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Color(0xFF7C5CFC)))),
           ]));
@@ -852,9 +874,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         showDialog(context: context, builder: (_) => AlertDialog(
           backgroundColor: const Color(0xFF12121A),
           title: const Text('Оновлень немає', style: TextStyle(color: Colors.white)),
-          content: Text(
-            'Для платформи ${platform.toUpperCase()} новіших релізів не знайдено (поточна v$currentStr).\n\nПеревіряються назва/тег/опис релізів на наявність позначки платформи (наприклад: iOS, Windows, Android).',
-            style: const TextStyle(color: Color(0xFFCCCCDD), fontSize: 13)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Для платформи ${platform.toUpperCase()} новіших релізів не знайдено (поточна v$currentStr).',
+                style: const TextStyle(color: Color(0xFFCCCCDD), fontSize: 13)),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => openUrl(releasesUrl),
+                child: const Text('Всі релізи на GitHub →',
+                  style: TextStyle(color: Color(0xFF7C5CFC), fontSize: 13,
+                    decoration: TextDecoration.underline)),
+              ),
+            ],
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Color(0xFF7C5CFC)))),
           ]));
