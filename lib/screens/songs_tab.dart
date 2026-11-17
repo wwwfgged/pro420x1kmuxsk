@@ -50,7 +50,10 @@ class SongsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(child: Column(children: [
+    // Нижній SafeArea тут НЕ потрібен: мініплеєр і навігація лежать у
+    // слотах Scaffold, який сам враховує home indicator. Подвійний
+    // bottom-padding відсував би останній рядок списку зайвим проміжком.
+    return SafeArea(bottom: false, child: Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Row(children: [
           if (AppConfig.avatarPath != null) ...[
@@ -112,7 +115,7 @@ class SongsTab extends StatelessWidget {
             const Text('Завантаж або імпортуй музику',
               style: TextStyle(color: Color(0xFF6A6A88), fontSize: 14)),
           ]))
-        : ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+        : ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
             if (songs.isNotEmpty) ...[
               SectionHeader(icon: Icons.music_note_rounded, title: 'Пісні', count: songs.length),
               ...songs.map((s) => SongTile(

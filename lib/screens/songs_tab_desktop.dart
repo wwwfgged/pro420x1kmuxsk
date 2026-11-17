@@ -937,7 +937,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _settingsContent(BuildContext context) =>
-    SafeArea(child: ListView(padding: const EdgeInsets.all(24), children: [
+    // Нижній SafeArea не потрібен — його вже враховує Scaffold через
+    // bottomNavigationBar та bottomSheet із мініплеєром.
+    SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.all(24), children: [
       Row(children: [
         ShaderMask(
           shaderCallback: (b) => LinearGradient(

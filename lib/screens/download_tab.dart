@@ -11,7 +11,8 @@ class DownloadTab extends StatelessWidget {
   const DownloadTab({super.key, required this.onSongAdded});
 
   @override
-  Widget build(BuildContext context) => SafeArea(child: Column(children: [
+  // bottom:false — нижній відступ уже дає Scaffold (bottomSheet + навігація).
+  Widget build(BuildContext context) => SafeArea(bottom: false, child: Column(children: [
     Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         ShaderMask(

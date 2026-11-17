@@ -729,88 +729,90 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                 child: Container(color: Colors.black.withOpacity(0.55)))),
             ],
             Scaffold(
-            backgroundColor: AppConfig.hasCustomBackground ? Colors.transparent : const Color(0xFF0A0A0F),
-            body: Stack(children: [
-            Column(children: [
-              Expanded(child: IndexedStack(index: _tab, children: [
-                AppConfig.desktopLayout ? _iosTop(SongsTabDesktop(
-                  songs: _songs,
-                  playlists: _playlists,
-                  currentSong: _currentSong,
-                  onPlay: (s) => _playSong(s, queue: _songs),
-                  onPlayPlaylist: (s, pl) => _playSong(s, queue: pl.songs),
-                  onRefresh: _loadAll,
-                  editMode: _editMode,
-                  onToggleEdit: () => setState(() => _editMode = !_editMode),
-                  onSongMenu: _showSongMenu,
-                  onCreatePlaylist: _createPlaylist,
-                  onDeletePlaylist: _deletePlaylist,
-                  onVersionTap: _onVersionTap,
-                  onSettings: () => setState(() => _tab = 2),
-                )) : SongsTab(
-                  songs: _songs,
-                  playlists: _playlists,
-                  currentSong: _currentSong,
-                  onPlay: (s) => _playSong(s, queue: _songs),
-                  onPlayPlaylist: (s, pl) => _playSong(s, queue: pl.songs),
-                  onRefresh: _loadAll,
-                  editMode: _editMode,
-                  onToggleEdit: () => setState(() => _editMode = !_editMode),
-                  onSongMenu: _showSongMenu,
-                  onCreatePlaylist: _createPlaylist,
-                  onDeletePlaylist: _deletePlaylist,
-                  onVersionTap: _onVersionTap,
-                ),
-                _iosTop(DownloadTab(onSongAdded: _loadAll)),
-                _iosTop(SettingsScreen(onEasterEgg: _openMiniDoom,
-                  songs: _songs, playlists: _playlists, onDataChanged: _loadAll,
-                  onWallpaperChanged: () => setState(() {}))),
-              ])),
-              // На Android мініплеєр докований у звичайному потоці —
-              // прямо над нижньою навігацією (не поверх neї), без
-              // ручного розрахунку відступів.
-              if (!Platform.isWindows && _currentSong != null)
-                AppConfig.useLegacyPlayer
-                    ? LegacyMobileMiniPlayer(
-                        song: _currentSong!,
-                        isPlaying: _isPlaying,
-                        position: _position,
-                        duration: _duration,
-                        onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                        onNext: _playNext,
-                        onPrev: _playPrev,
-                        onStop: _stopPlayer,
-                      )
-                    : MobileMiniPlayer(
-                        song: _currentSong!,
-                        isPlaying: _isPlaying,
-                        position: _position,
-                        duration: _duration,
-                        onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                        onNext: _playNext,
-                        onPrev: _playPrev,
-                        onStop: _stopPlayer,
-                      ),
-              AeroBottomNav(current: _tab, onChange: (i) => setState(() => _tab = i)),
-            ]),
-            // На Windows — ефемерний Media Overlay (з'являється при
-            // наведенні). На Android hover немає — мініплеєр вже
-            // показаний вище, у звичайному потоці Column.
-            if (Platform.isWindows)
-              Positioned.fill(child: MediaOverlay(
-                song: _currentSong,
-                isPlaying: _isPlaying,
-                position: _position,
-                duration: _duration,
-                onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
-                onNext: _playNext,
-                onPrev: _playPrev,
-                onStop: _stopPlayer,
-                onMinimize: _toggleMinimize,
-                onSeek: (pos) => Player.seek(pos),
-              )),
-          ]),
-          ),
+              backgroundColor: AppConfig.hasCustomBackground ? Colors.transparent : const Color(0xFF0A0A0F),
+              // Тіло — єдиний слот, чию висоту Scaffold обмежує сам, з
+              // урахуванням bottomSheet (мініплеєр) і bottomNavigationBar.
+              // Тому список завжди прокручується до останнього рядка й
+              // не ховається під плеєром/навігацією.
+              body: Stack(children: [
+                IndexedStack(index: _tab, children: [
+                  AppConfig.desktopLayout ? _iosTop(SongsTabDesktop(
+                    songs: _songs,
+                    playlists: _playlists,
+                    currentSong: _currentSong,
+                    onPlay: (s) => _playSong(s, queue: _songs),
+                    onPlayPlaylist: (s, pl) => _playSong(s, queue: pl.songs),
+                    onRefresh: _loadAll,
+                    editMode: _editMode,
+                    onToggleEdit: () => setState(() => _editMode = !_editMode),
+                    onSongMenu: _showSongMenu,
+                    onCreatePlaylist: _createPlaylist,
+                    onDeletePlaylist: _deletePlaylist,
+                    onVersionTap: _onVersionTap,
+                    onSettings: () => setState(() => _tab = 2),
+                  )) : SongsTab(
+                    songs: _songs,
+                    playlists: _playlists,
+                    currentSong: _currentSong,
+                    onPlay: (s) => _playSong(s, queue: _songs),
+                    onPlayPlaylist: (s, pl) => _playSong(s, queue: pl.songs),
+                    onRefresh: _loadAll,
+                    editMode: _editMode,
+                    onToggleEdit: () => setState(() => _editMode = !_editMode),
+                    onSongMenu: _showSongMenu,
+                    onCreatePlaylist: _createPlaylist,
+                    onDeletePlaylist: _deletePlaylist,
+                    onVersionTap: _onVersionTap,
+                  ),
+                  _iosTop(DownloadTab(onSongAdded: _loadAll)),
+                  _iosTop(SettingsScreen(onEasterEgg: _openMiniDoom,
+                    songs: _songs, playlists: _playlists, onDataChanged: _loadAll,
+                    onWallpaperChanged: () => setState(() {}))),
+                ]),
+                // На Windows — ефемерний Media Overlay (при наведенні).
+                if (Platform.isWindows)
+                  Positioned.fill(child: MediaOverlay(
+                    song: _currentSong,
+                    isPlaying: _isPlaying,
+                    position: _position,
+                    duration: _duration,
+                    onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                    onNext: _playNext,
+                    onPrev: _playPrev,
+                    onStop: _stopPlayer,
+                    onMinimize: _toggleMinimize,
+                    onSeek: (pos) => Player.seek(pos),
+                  )),
+              ]),
+              // Мініплеєр лежить у власному слоті Scaffold НАД навігацією,
+              // а не поверх контенту. Scaffold сам віднімає його висоту
+              // від тіла — жодних ручних відступів і перекриттів.
+              bottomSheet: (!Platform.isWindows && _currentSong != null)
+                  ? (AppConfig.useLegacyPlayer
+                      ? LegacyMobileMiniPlayer(
+                          song: _currentSong!,
+                          isPlaying: _isPlaying,
+                          position: _position,
+                          duration: _duration,
+                          onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                          onNext: _playNext,
+                          onPrev: _playPrev,
+                          onStop: _stopPlayer,
+                        )
+                      : MobileMiniPlayer(
+                          song: _currentSong!,
+                          isPlaying: _isPlaying,
+                          position: _position,
+                          duration: _duration,
+                          onPlayPause: () => _isPlaying ? Player.pause() : Player.resume(),
+                          onNext: _playNext,
+                          onPrev: _playPrev,
+                          onStop: _stopPlayer,
+                        ))
+                  : null,
+              bottomNavigationBar:
+                  AeroBottomNav(current: _tab, onChange: (i) => setState(() => _tab = i)),
+            ),
         ]);
   }
 }
