@@ -19,8 +19,13 @@ class AppConfig {
   static bool _testMode = false;
   static bool get testMode => _testMode;
 
-  // На Android за замовчуванням мобільний UI (SongsTab), на Windows —
-  // ПК-розкладка (SongsTabDesktop). --linold перемикає вручну.
+  // СТАРИЙ ДИЗАЙН ПЛЕЄРА — єдиний підтримуваний і ЗАВЖДИ увімкнений.
+  // Новий скляний плеєр остаточно видалено (коміт d009b2d), перемикач
+  // useLegacyPlayer прибрано — цей прапорець лише фіксує намір у коді.
+  static const bool useOldPlayerDesign = true;
+
+  // На Android/iOS за замовчуванням і примусово старий мобільний UI
+  // (SongsTab + MobileMiniPlayer), на Windows — ПК-розкладка.
   static bool _desktopLayout = !isMobilePlatform;
   static bool get desktopLayout => _desktopLayout;
 
@@ -190,6 +195,16 @@ class AppConfig {
       }
     } catch (e) {
       print('[AppConfig] Load error: $e');
+    }
+
+    // СТАРИЙ ДИЗАЙН ЗА ЗАМОВЧУВАННЯМ: на мобільних завжди мобільний UI.
+    // Старі config.json могли зберегти desktopLayout: true (ПК-режим),
+    // через що замість старого плеєра показувався ПК-інтерфейс. Ігноруємо
+    // це значення на Android/iOS і зберігаємо виправлення.
+    if (isMobilePlatform && _desktopLayout) {
+      _desktopLayout = false;
+      await _save();
+      print('[AppConfig] 📱 Старий мобільний дизайн плеєра увімкнено');
     }
 
     // Ключі перезаписують збережені налаштування

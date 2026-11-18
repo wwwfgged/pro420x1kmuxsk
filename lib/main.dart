@@ -813,7 +813,8 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
               // Мініплеєр лежить у власному слоті Scaffold НАД навігацією,
               // а не поверх контенту. Scaffold сам віднімає його висоту
               // від тіла — жодних ручних відступів і перекриттів.
-              bottomSheet: (!Platform.isWindows && _currentSong != null)
+              // Старий дизайн плеєра увімкнений за замовчуванням (AppConfig).
+              bottomSheet: (!Platform.isWindows && _currentSong != null && AppConfig.useOldPlayerDesign)
                   ? MobileMiniPlayer(
                       song: _currentSong!,
                       isPlaying: _isPlaying,
