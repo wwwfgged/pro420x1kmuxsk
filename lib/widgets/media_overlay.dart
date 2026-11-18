@@ -109,9 +109,12 @@ class _MediaOverlayState extends State<MediaOverlay>
           child: const SizedBox(height: 60))),
 
       // Media overlay card
+      // Раніше був відступ 70px — картка висіла високо над нижньою
+      // навігацією. Тепер вона майже торкається навігації (6px), як і
+      // мініплеєр на мобільних.
       if (_visible)
         Positioned(
-          bottom: 70, right: 16,
+          bottom: 6, right: 16,
           left: null, top: null,
           child: ConstrainedBox(
             constraints: BoxConstraints(
