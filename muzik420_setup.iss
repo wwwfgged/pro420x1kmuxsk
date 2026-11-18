@@ -17,7 +17,7 @@
 ;    Це і є твій ОДИН файл — muzik420_setup.exe
 
 #define MyAppName "pro420x1kmuxsk"
-#define MyAppVersion "5.0"
+#define MyAppVersion "6.1.0"
 #define MyAppPublisher "pro420x1kmuxsk"
 #define MyAppExeName "muzik420_new.exe"
 #define MySourceDir "C:\muzik420_new\build\windows\x64\runner\Release"

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import '../platform_utils.dart';
 
-/// Конфігурація додатку pro420x1kmuxsk v6.0.1 (Windows)
+/// Конфігурація додатку pro420x1kmuxsk v6.1.0 (Windows)
 /// 
 /// Ключі запуску:
 ///   --help        Показати список ключів
@@ -214,7 +214,7 @@ class AppConfig {
   static void _printHelp() {
     print('''
 ╔══════════════════════════════════════════════╗
-║        pro420x1kmuxsk v6.0.1 (Windows)        ║
+║        pro420x1kmuxsk v6.1.0 (Windows)        ║
 ╚══════════════════════════════════════════════╝
 
 Використання:
